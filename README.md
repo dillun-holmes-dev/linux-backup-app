@@ -6,6 +6,9 @@ longer required.
 
 ![icon](my_backups/data/icon.svg)
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
+
 ## Features
 
 - **Overview** — live progress bars for daily, weekly, and monthly backups, upload speed,
@@ -161,3 +164,19 @@ Bug reports, feature ideas, and pull requests are welcome! `main` is
 protected: all changes land via pull request with an approving review — you
 cannot push directly to `main` or merge your own pull request. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
+## Support
+
+If VaultLeaf Backup keeps your files safe (and your stress levels down),
+consider sponsoring the project on GitHub — every bit is genuinely
+appreciated! 🙏
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
+
+## License
+
+Copyright 2026 dillun-holmes-dev
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may use,
+modify, and distribute this project under that license; see the
+[LICENSE](LICENSE) file for the full terms.
