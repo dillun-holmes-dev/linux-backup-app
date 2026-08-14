@@ -1,0 +1,14 @@
+#!/bin/sh
+# AppImage entry point.  Uses the host's python3 + GTK (PyGObject/GTK4).
+# Resolve the real AppRun path whether run from the AppImage or an AppDir.
+SELF="$0"
+while [ -h "$SELF" ]; do
+    LINK="$(readlink "$SELF")"
+    case "$LINK" in
+        /*) SELF="$LINK" ;;
+        *) SELF="$(dirname "$SELF")/$LINK" ;;
+    esac
+done
+APPDIR="$(cd "$(dirname "$SELF")" && pwd)"
+export PYTHONPATH="$APPDIR/usr/lib/my-backups${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m my_backups "$@"

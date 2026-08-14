@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=VaultLeaf Backup
+GenericName=Backup manager
+Comment=Friendly encrypted backups and safe file recovery
+Exec=my-backups
+Icon=my-backups
+Terminal=false
+Categories=Utility;System;
+Keywords=backup;restic;rclone;google drive;
+StartupNotify=true

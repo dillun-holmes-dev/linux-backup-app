@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Restic / rclone runtime artifacts
+*.restic
+restic-passphrase*
+backup-key*
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
