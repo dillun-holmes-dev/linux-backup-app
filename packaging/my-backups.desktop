@@ -6,6 +6,6 @@ Comment=Friendly encrypted backups and safe file recovery
 Exec=my-backups
 Icon=my-backups
 Terminal=false
-Categories=Utility;System;
+Categories=Utility;Archiving;FileTools;
 Keywords=backup;restic;rclone;google drive;
 StartupNotify=true

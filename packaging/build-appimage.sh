@@ -41,9 +41,13 @@ cp "$HERE/AppRun" "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
 
 # 3) Desktop entry + icon
+#    appimagetool requires a .desktop file at the AppDir root, and the
+#    system menu entry goes under usr/share/applications.
+cp "$HERE/my-backups.desktop" "$APPDIR/my-backups.desktop"
 cp "$HERE/my-backups.desktop" "$APPDIR/usr/share/applications/"
 cp "$ROOT/my_backups/data/icon.svg" \
     "$APPDIR/usr/share/icons/hicolor/scalable/apps/my-backups.svg"
+cp "$ROOT/my_backups/data/icon.svg" "$APPDIR/my-backups.svg"
 cp "$ROOT/my_backups/data/icon.svg" "$APPDIR/.DirIcon"
 
 # 4) appimagetool (downloaded once into packaging/)
@@ -57,7 +61,7 @@ fi
 
 # 5) Build
 echo "==> Building $OUT"
-"$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
+ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
 
 echo ""
 echo "==> Done: $OUT"

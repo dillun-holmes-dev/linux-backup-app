@@ -55,7 +55,7 @@ Name=VaultLeaf Backup
 Comment=Automatic restic and rclone backups
 Exec=$BIN_DIR/my-backups
 Icon=drive-harddisk
-Categories=Utility;System;
+Categories=Utility;Archiving;FileTools;
 EOF
 
 echo "VaultLeaf Backup is installed. No more administrator access is needed."
