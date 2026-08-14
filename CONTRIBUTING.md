@@ -4,6 +4,35 @@ Thanks for wanting to help! This project is community-driven, but it is a
 **single-maintainer project**: all changes land on `main` only through
 pull requests that the maintainer reviews and merges.
 
+## Ways to contribute
+
+Everyone is welcome — from first-time contributors to seasoned maintainers.
+**No contribution is too small.**
+
+- 🐛 **Report a bug** — open an issue using the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+- 💭 **Suggest a feature or idea** — open an issue with the [feature request template](.github/ISSUE_TEMPLATE/feature_request.yml)
+- 📖 **Improve the docs** — README, this file, comments.
+- 🔧 **Fix something or add a feature** — fork, branch, and open a pull request.
+- 💬 **Help triage** — reproduce bugs, answer questions, or clarify issues.
+
+A typo fix, a clearer error message, or a well-written bug report all count.
+
+## Your first pull request
+
+1. **Fork** the repo (button at the top-right of the GitHub page).
+2. **Clone** your fork and create a branch:
+   ```sh
+   git clone https://github.com/<your-username>/linux-backup-app.git
+   cd linux-backup-app
+   git checkout -b fix/my-improvement
+   ```
+3. Make your change and **commit** it with a clear message.
+4. **Push** the branch to your fork and **open a pull request** against `main`.
+5. The maintainer reviews and merges it. That's it! 🎉
+
+New to this? A well-explained pull request beats a perfect one — questions in
+the PR description are always welcome.
+
 ## How contributions work
 
 | Action | Allowed? |
@@ -57,3 +86,9 @@ When opening an issue, include:
 - Steps to reproduce.
 - Expected vs. actual behavior.
 - Any relevant log output (sanitize secrets/credentials first).
+
+## License & legal
+
+This project is licensed under the [Apache License 2.0](LICENSE). By
+submitting a pull request or issue, you agree that your contributions are
+provided under the same license.

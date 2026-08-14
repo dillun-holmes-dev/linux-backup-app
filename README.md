@@ -160,10 +160,19 @@ ln -s /opt/VaultLeafBackup-x86_64.AppImage ~/.local/bin/my-backups
 
 ## Contributing
 
-Bug reports, feature ideas, and pull requests are welcome! `main` is
-protected: all changes land via pull request with an approving review — you
-cannot push directly to `main` or merge your own pull request. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+Found a bug? Have an idea? Want to lend a hand? **All are welcome!**
+
+- 🐛 **Report a bug** — open an issue with the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+- 💭 **Suggest a feature** — use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.yml)
+- 🔧 **Send a fix or improvement** — fork and open a [pull request](.github/pull_request_template.md)
+
+Every contribution counts — from a one-line typo fix to a whole feature.
+`main` is protected: changes land via a reviewed pull request, and the
+maintainer merges. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
+workflow.
+
+[![Issues](https://img.shields.io/github/issues/dillun-holmes-dev/linux-backup-app)](https://github.com/dillun-holmes-dev/linux-backup-app/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/dillun-holmes-dev/linux-backup-app)](https://github.com/dillun-holmes-dev/linux-backup-app/pulls)
 
 ## Support
 
@@ -172,6 +181,11 @@ consider sponsoring the project on GitHub — every bit is genuinely
 appreciated! 🙏
 
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
+
+## Acknowledgements
+
+Thanks to **Andrew Tennant** for the inspiration behind VaultLeaf Backup —
+what started as a collection of shell scripts became a proper app. 🙌
 
 ## License
 

@@ -1,0 +1,60 @@
+name: 🐛 Bug report
+description: Report a problem so we can fix it
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in as much as you can.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version are you running? (e.g. 1.0.0, or from `--version`)
+      placeholder: "e.g. 1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: distro
+    attributes:
+      label: Distribution / OS
+      description: What OS are you on?
+      options:
+        - Ubuntu
+        - Debian
+        - Fedora
+        - Arch
+        - openSUSE
+        - Other Linux
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen.
+      placeholder: "Tell us what you were doing and what went wrong."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce the problem?
+      placeholder: |
+        1. Open Backup plan
+        2. ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any log output. Please remove/sanitize secrets, tokens, and personal paths first.
+      render: shell
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Security:** never paste passwords, rclone tokens, restic passphrases, or Google credentials. Sanitize all logs.

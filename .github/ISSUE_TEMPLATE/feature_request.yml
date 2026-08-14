@@ -1,0 +1,33 @@
+name: 💭 Feature request
+description: Suggest an idea for VaultLeaf Backup
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an idea! Feature ideas help shape the app.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: What are you trying to do that the app can't do yet?
+      placeholder: "I'd like to be able to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How do you imagine this working?
+      placeholder: "A new toggle in Settings that..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Any workarounds you've tried?
+  - type: markdown
+    attributes:
+      value: |
+        You can also open a pull request to implement your idea — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
