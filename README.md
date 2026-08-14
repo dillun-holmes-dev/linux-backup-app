@@ -154,3 +154,10 @@ ln -s /opt/VaultLeafBackup-x86_64.AppImage ~/.local/bin/my-backups
 - Setup data is kept in `~/.local/share/my-backups/`; advanced configuration
   is in `~/.config/my-backups/config.json`.
 - Secrets are **not** bundled in the AppImage.
+
+## Contributing
+
+Bug reports, feature ideas, and pull requests are welcome! `main` is
+protected: all changes land via pull request with an approving review — you
+cannot push directly to `main` or merge your own pull request. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
