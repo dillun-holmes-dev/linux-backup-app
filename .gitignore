@@ -10,6 +10,11 @@ venv/
 restic-passphrase*
 backup-key*
 
+# Build outputs (AppImage)
+VaultLeafBackup-*.AppImage
+packaging/build/
+packaging/appimagetool-*.AppImage
+
 # Editor / OS
 .vscode/
 .idea/

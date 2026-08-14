@@ -7,4 +7,4 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 
-__version__ = "2.1.0"
+__version__ = "1.0.0"
