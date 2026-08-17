@@ -6,6 +6,7 @@ All blocking work (restic/rclone calls) happens in background threads so
 the UI never freezes.
 """
 import fnmatch
+import getpass
 import json
 import os
 import re
@@ -1195,6 +1196,9 @@ output={q(output)}
 log={q(log)}
 mkdir -p "$(dirname "$output")" "$(dirname "$log")"
 if [ "$(id -u)" -ne 0 ]; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n -l 2>/dev/null | grep -qF "$0"; then
+    exec sudo -n "$0"
+  fi
   exec pkexec "$0"
 fi
 if ! command -v zstd >/dev/null 2>&1; then
@@ -1836,6 +1840,57 @@ def verify_replica(cfg, key, on_done=None):
         except Exception as exc:  # noqa: BLE001
             if on_done:
                 on_done(False, str(exc))
+    threading.Thread(target=work, daemon=True).start()
+
+
+def admin_rights_granted():
+    """True when the app's root commands can run without a password."""
+    if not shutil.which("sudo"):
+        return False
+    try:
+        result = _run_process(["sudo", "-n", "-l"], capture_output=True,
+                              text=True, timeout=10)
+        if result.returncode != 0:
+            return False
+        script = str(DATA_DIR / "run-system-image.sh")
+        return "NOPASSWD" in result.stdout and script in result.stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def grant_admin_rights(cfg, on_done=None):
+    """Install a NOPASSWD sudoers entry for the app's root commands.
+
+    The user authenticates once via the system prompt; afterwards the
+    bootable system-image runner runs without asking again.
+    """
+    script = str(DATA_DIR / "run-system-image.sh")
+    user = getpass.getuser()
+    installer = DATA_DIR / "install-admin-rights.sh"
+    snippet = f"{user} ALL=(root) NOPASSWD: {script}\n"
+    content = f'''#!/bin/sh
+set -eu
+snippet_file="$(mktemp)"
+trap 'rm -f "$snippet_file"' EXIT
+printf '%s' {shlex.quote(snippet)} >"$snippet_file"
+visudo -cf "$snippet_file" >/dev/null
+install -m 0440 -o root -g root "$snippet_file" /etc/sudoers.d/vaultleaf-backup
+visudo -c >/dev/null
+'''
+    _write_private(installer, content, executable=True)
+
+    def work():
+        try:
+            result = _run_process(["pkexec", str(installer)],
+                                  capture_output=True, text=True, timeout=120)
+            ok = result.returncode == 0
+            message = ("Permanent admin permission granted." if ok else
+                       "Permission was not granted; system images will ask for a "
+                       "password each run.")
+        except Exception as exc:  # noqa: BLE001
+            ok, message = False, f"Could not grant permission: {exc}"
+        if on_done:
+            on_done(ok, message)
     threading.Thread(target=work, daemon=True).start()
 
 

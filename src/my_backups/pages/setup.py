@@ -63,6 +63,16 @@ class SetupPage(Gtk.Box):
         self.append(header)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
+        if self.cfg.get("setup_complete"):
+            setup_banner = Gtk.Label(
+                label="✓ Already set up — these are your current settings. "
+                      "Change anything below and press Save changes.",
+                xalign=0, wrap=True)
+            setup_banner.add_css_class("success")
+            setup_banner.set_margin_top(8)
+            setup_banner.set_margin_bottom(4)
+            self.append(setup_banner)
+
         self.wizard = Gtk.Stack()
         self.wizard.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         self.wizard.set_transition_duration(220)
@@ -246,6 +256,24 @@ class SetupPage(Gtk.Box):
         note.add_css_class("dim-label")
         install_box.append(note)
         page.append(install_frame)
+
+        admin_frame, admin_box = self._frame("Permanent admin permission")
+        self.admin_status = Gtk.Label(label="Checking…", xalign=0, wrap=True)
+        admin_box.append(self.admin_status)
+        self.admin_btn = Gtk.Button(
+            label="Grant permanent permission — one-time password")
+        self.admin_btn.set_halign(Gtk.Align.START)
+        self.admin_btn.connect("clicked", self._grant_admin)
+        admin_box.append(self.admin_btn)
+        admin_note = Gtk.Label(
+            label="Only used for bootable system-image backups. You enter your "
+                  "administrator password once; afterwards the image backup runs "
+                  "without asking again.", xalign=0, wrap=True)
+        admin_note.add_css_class("dim-label")
+        admin_box.append(admin_note)
+        page.append(admin_frame)
+        GLib.idle_add(self._refresh_admin_status)
+
         self.wizard.add_named(wrapper, "step-0")
 
     # -------------------------------------------------------------- page two
@@ -807,6 +835,33 @@ class SetupPage(Gtk.Box):
         self.install_status.set_label(message)
         if ok:
             self.install_btn.set_label("✓ Components installed")
+        self.app.window.toast(message, "info" if ok else "error")
+        return False
+
+    def _refresh_admin_status(self):
+        granted = B.admin_rights_granted()
+        self.admin_status.set_label(
+            "✓ Permanent permission is active" if granted else
+            "System-image backups will ask for your password each run")
+        self.admin_btn.set_sensitive(not granted)
+        self.admin_btn.set_label(
+            "Grant permanent permission — one-time password" if not granted else
+            "Permanent permission is active")
+        return False
+
+    def _grant_admin(self, _button):
+        self.admin_btn.set_sensitive(False)
+        self.admin_status.set_label("Waiting for one-time administrator approval…")
+        B.grant_admin_rights(self.cfg, lambda ok, message: GLib.idle_add(
+            self._admin_done, ok, message))
+
+    def _admin_done(self, ok, message):
+        granted = B.admin_rights_granted()
+        self.admin_status.set_label(("✓ " if ok else "") + message)
+        self.admin_btn.set_sensitive(not granted)
+        self.admin_btn.set_label(
+            "Grant permanent permission — one-time password" if not granted else
+            "Permanent permission is active")
         self.app.window.toast(message, "info" if ok else "error")
         return False
 
