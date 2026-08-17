@@ -60,8 +60,8 @@ class RestorePage(Gtk.Box):
         backup_frame, backup = self._frame("1. Choose a backup")
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         row.append(Gtk.Label(label="History", xalign=0))
-        self.repo_dd = Gtk.DropDown(model=Gtk.StringList(
-            strings=[label for _, label in _REPOS]))
+        self.repo_dd = Gtk.DropDown(model=Gtk.StringList.new(
+            [label for _, label in _REPOS]))
         self.repo_dd.connect("notify::selected", lambda *_: self._refresh_snapshots(True))
         row.append(self.repo_dd)
         refresh = Gtk.Button(label="Refresh")
@@ -187,7 +187,7 @@ class RestorePage(Gtk.Box):
             except ValueError:
                 friendly = snap["time"]
             labels.append(friendly)
-        self.snap_dd.set_model(Gtk.StringList(strings=labels))
+        self.snap_dd.set_model(Gtk.StringList.new(labels))
         self.snap_dd.set_selected(0 if snaps else Gtk.INVALID_LIST_POSITION)
         self.restore_btn.set_sensitive(bool(snaps))
         self.snapshot_info.set_label(

@@ -20,6 +20,11 @@
     <category>Archiving</category>
   </categories>
   <releases>
+    <release version="1.1.2" date="2026-08-17">
+      <description>
+        <p>Fixes startup on Linux systems with newer GLib application flags.</p>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-08-17">
       <description>
         <p>Adds signed updates and verifiable GitHub build provenance.</p>
