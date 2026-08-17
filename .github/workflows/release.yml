@@ -40,8 +40,8 @@ jobs:
         run: ./packaging/build-release.sh
       - name: Test embedded runtime
         run: |
-          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --version
-          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --self-test
+          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --version
+          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --self-test
       - uses: actions/upload-artifact@v4
         with:
           name: VaultLeafBackup-${{ matrix.arch }}
