@@ -576,7 +576,7 @@ class SetupPage(Gtk.Box):
             "Check the summary below. Use Back to change anything. Applying updates schedules "
             "safely and never deletes existing backup snapshots.")
         self.review_heading = page.get_first_child()
-        self.review_subtitle = page.get_child_at_index(1)
+        self.review_subtitle = self.review_heading.get_next_sibling()
         review_frame, review_box = self._frame("Your backup plan")
         self.review_label = Gtk.Label(label="", xalign=0, wrap=True, selectable=True)
         review_box.append(self.review_label)
