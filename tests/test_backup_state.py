@@ -43,6 +43,15 @@ class BackupStateTest(unittest.TestCase):
             with patch.object(backend, "service_running", return_value=False):
                 self.assertFalse(backend.backup_incomplete(self.config(output), "daily"))
 
+    def test_new_summary_completes_an_old_manual_start_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "daily.json"
+            marker = Path(str(output) + ".run")
+            marker.write_text(json.dumps({"state": "running"}))
+            output.write_text(json.dumps({"message_type": "summary"}) + "\n")
+            with patch.object(backend, "service_running", return_value=False):
+                self.assertFalse(backend.backup_incomplete(self.config(output), "daily"))
+
 
 if __name__ == "__main__":
     unittest.main()

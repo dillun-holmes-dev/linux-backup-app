@@ -107,7 +107,7 @@ def _quit_existing_instance():
 
 
 def handoff_to_installed_appimage():
-    """Install a downloaded AppImage, then replace this process with it."""
+    """Install a download and make all integration target the stable copy."""
     source = os.environ.get("APPIMAGE")
     if not source:
         return False
@@ -122,6 +122,13 @@ def handoff_to_installed_appimage():
     if changed:
         _quit_existing_instance()
     remove_downloaded_copies(target)
-    env = _clean_appimage_environment()
-    os.execve(str(target), [str(target), *sys.argv[1:]], env)
-    return True
+    if not changed and appimage_version(target) > _version_tuple(VERSION):
+        # Never run older bundled code when a newer stable copy exists.
+        env = _clean_appimage_environment()
+        os.execve(str(target), [str(target), *sys.argv[1:]], env)
+    # The code already mounted from the download is byte-for-byte the newly
+    # installed version. Continue it directly so first launch does not nest a
+    # second AppImage runtime. Desktop entries, autostart, and updates must all
+    # use the stable path from this point onward.
+    os.environ["APPIMAGE"] = str(target)
+    return False

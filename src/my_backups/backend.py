@@ -196,16 +196,36 @@ def backup_incomplete(cfg, key, running=None):
     if not output:
         return False
     state_path = Path(str(output) + ".run")
+    status = last_status(output)
     try:
         state = json.loads(state_path.read_text()).get("state")
         if state == "complete":
             return False
         if state in ("running", "interrupted", "failed"):
+            # Upgraded installations may still have a pre-1.2 runner. A
+            # summary written after our manual-start marker proves completion.
+            if (state == "running" and status and status.get("summary") and
+                    Path(output).stat().st_mtime >= state_path.stat().st_mtime):
+                return False
             return True
     except (OSError, ValueError, TypeError):
         pass
-    status = last_status(output)
     return bool(status and not status.get("summary"))
+
+
+def _mark_backup_started(cfg, key):
+    """Create a run marker even when an older generated runner is installed."""
+    output = cfg.get(key + "_json")
+    if not output:
+        return
+    state_path = Path(str(output) + ".run")
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = state_path.with_name(f"{state_path.name}.tmp.{os.getpid()}")
+    temporary.write_text(json.dumps({
+        "key": key, "state": "running", "started_at": datetime.now().astimezone().isoformat()
+    }) + "\n")
+    os.chmod(temporary, 0o600)
+    temporary.replace(state_path)
 
 
 def service_running(svc, cfg=None):
@@ -1402,6 +1422,12 @@ def start_backup(cfg, key, on_done=None):
         if service_running(svc, cfg):
             if on_done:
                 on_done(False, f"The {key} backup is already running")
+            return
+        try:
+            _mark_backup_started(cfg, key)
+        except OSError as exc:
+            if on_done:
+                on_done(False, f"Could not record backup state: {exc}")
             return
         if cfg.get("scheduler_backend") == "internal":
             try:

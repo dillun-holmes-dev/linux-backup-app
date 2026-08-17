@@ -20,6 +20,11 @@
     <category>Archiving</category>
   </categories>
   <releases>
+    <release version="1.2.1" date="2026-08-17">
+      <description>
+        <p>Streamlines first-run AppImage handoff and recovery state for upgraded installations.</p>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-08-17">
       <description>
         <p>Installs one stable AppImage, reopens the running application, and adds manual and interrupted-backup continuation controls.</p>
