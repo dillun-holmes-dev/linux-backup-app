@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.venv
+.vscode
+__pycache__
+*.pyc
+*.AppImage
+dist
+packaging/appimagetool-*.AppImage
+packaging/build

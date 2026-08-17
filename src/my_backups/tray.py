@@ -1,6 +1,8 @@
 """Small StatusNotifierItem implementation for cross-desktop tray support."""
 from gi.repository import Gio, GLib
 
+from .metadata import APP_ICON, APP_NAME
+
 
 SNI_XML = """
 <node>
@@ -69,18 +71,18 @@ class TrayIcon:
     def _get_property(self, _connection, _sender, _path, _interface, name):
         values = {
             "Category": GLib.Variant("s", "SystemServices"),
-            "Id": GLib.Variant("s", "my-backups"),
-            "Title": GLib.Variant("s", "VaultLeaf Backup"),
+            "Id": GLib.Variant("s", APP_ICON),
+            "Title": GLib.Variant("s", APP_NAME),
             "Status": GLib.Variant("s", self.status),
             "WindowId": GLib.Variant("u", 0),
-            "IconName": GLib.Variant("s", "drive-harddisk-symbolic"),
+            "IconName": GLib.Variant("s", APP_ICON),
             "IconPixmap": GLib.Variant("a(iiay)", []),
             "AttentionIconName": GLib.Variant("s", "dialog-warning-symbolic"),
             "AttentionIconPixmap": GLib.Variant("a(iiay)", []),
             "OverlayIconName": GLib.Variant("s", ""),
             "OverlayIconPixmap": GLib.Variant("a(iiay)", []),
             "ToolTip": GLib.Variant("(sa(iiay)ss)",
-                                    ("drive-harddisk-symbolic", [], "VaultLeaf Backup",
+                                    (APP_ICON, [], APP_NAME,
                                      "Running in the background")),
             "ItemIsMenu": GLib.Variant("b", False),
             "Menu": GLib.Variant("o", "/"),

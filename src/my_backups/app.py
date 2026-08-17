@@ -4,6 +4,7 @@ Main window with a native sidebar (StackSidebar) and five pages:
 Setup, Overview, Backups & logs, Restore, and Settings. A 1 s timer refreshes the
 visible page from the backend so progress is always live.
 """
+import ctypes
 import sys
 import threading
 from pathlib import Path
@@ -11,14 +12,26 @@ from pathlib import Path
 from gi.repository import Gio, GLib, Gtk
 
 from . import backend as B
+from . import updates
 from .pages.backups import BackupsPage
 from .pages.overview import OverviewPage
 from .pages.restore import RestorePage
 from .pages.setup import SetupPage
 from .pages.settings import SettingsPage
 from .tray import TrayIcon
+from .metadata import APP_ICON, APP_ID, APP_NAME, EXECUTABLE_NAME
 
-APP_ID = "io.mybackups.App"
+
+def _set_linux_identity():
+    """Give launchers, docks, and process viewers one consistent identity."""
+    GLib.set_prgname(EXECUTABLE_NAME)
+    GLib.set_application_name(APP_NAME)
+    Gtk.Window.set_default_icon_name(APP_ICON)
+    try:
+        # Linux limits the task name to 15 visible bytes.
+        ctypes.CDLL(None).prctl(15, b"VaultLeaf", 0, 0, 0)
+    except (AttributeError, OSError):
+        pass
 
 
 class BackupWindow(Gtk.ApplicationWindow):
@@ -162,6 +175,7 @@ class BackupApplication(Gtk.Application):
         self._add_action("open-drive", lambda: B.open_folder(self.cfg["drive_dir"]))
         self._add_action("change-storage", lambda: self._open_setup(1))
         self._add_action("change-schedule", lambda: self._open_setup(3))
+        self._add_action("open-settings", lambda: self._open_page("settings"))
         self._add_action("show", self.show_main_window)
         self._add_action("tray-controller", self.show_tray_controller)
         self._add_action("quit-from-tray", self._quit_from_tray)
@@ -173,6 +187,7 @@ class BackupApplication(Gtk.Application):
             self.tray = TrayIcon(self)
             GLib.timeout_add_seconds(30, self.tray.retry_registration)
             threading.Thread(target=self._start_portable_services, daemon=True).start()
+            threading.Thread(target=self._check_available_update, daemon=True).start()
             if not self._background_start:
                 self.window.present()
             GLib.timeout_add(1000, self._tick)
@@ -184,6 +199,21 @@ class BackupApplication(Gtk.Application):
     def _start_portable_services(self):
         B.ensure_portable_mount(self.cfg)
         B.run_portable_schedule(self.cfg)
+
+    def _check_available_update(self):
+        try:
+            release = updates.check_latest_release()
+            if updates.is_newer(release.version):
+                GLib.idle_add(self._notify_available_update, release.version)
+        except Exception:
+            pass
+
+    def _notify_available_update(self, version):
+        notice = Gio.Notification.new(f"VaultLeaf {version} is available")
+        notice.set_body("Open Settings to download and verify the update.")
+        notice.add_button("Open Settings", "app.open-settings")
+        self.send_notification("update-available", notice)
+        return False
 
     def _tick(self):
         self._tick_count += 1
@@ -208,6 +238,12 @@ class BackupApplication(Gtk.Application):
         self.show_main_window()
         if self.window is not None:
             self.window.open_setup_step(step)
+        return False
+
+    def _open_page(self, name):
+        self.show_main_window()
+        if self.window is not None:
+            self.window.stack.set_visible_child_name(name)
         return False
 
     def show_tray_controller(self):
@@ -311,5 +347,6 @@ class BackupApplication(Gtk.Application):
 
 
 def main():
+    _set_linux_identity()
     app = BackupApplication()
     return app.run(sys.argv)

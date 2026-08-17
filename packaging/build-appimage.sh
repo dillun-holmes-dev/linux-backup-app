@@ -1,70 +1,147 @@
 #!/usr/bin/env bash
-# Build "VaultLeaf Backup" as an AppImage.
+# Build a self-contained VaultLeaf Backup AppImage.
 #
-# The AppImage bundles the app code and ships a small launcher that uses
-# your system's python3 + GTK (python3-gi / GTK4).  That keeps it light
-# and reliable on this Ubuntu/GNOME machine while still giving you a
-# single double-clickable, icon-and-menu aware AppImage.
-#
-# Prerequisites: bash, curl.  (python3 + PyGObject + GTK4 on the host.)
-# Usage:   bash packaging/build-appimage.sh
-# Output:  VaultLeafBackup-x86_64.AppImage in the project root.
+# Runtime dependencies are bundled: Python, PyGObject, GTK4, restic and rclone.
+# Build dependencies are intentionally taken from the build machine. For broad
+# distro compatibility, build on the oldest Linux release you plan to support.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 APP_NAME="VaultLeafBackup"
-ARCH="x86_64"
+APP_ID="io.github.dillunholmes.VaultLeafBackup"
+ARCH="${ARCH:-$(uname -m)}"
 APPDIR="$HERE/build/AppDir"
 OUT="$ROOT/$APP_NAME-$ARCH.AppImage"
 
-echo "==> Preparing AppDir: $APPDIR"
+case "$ARCH" in
+    x86_64|aarch64) ;;
+    *) echo "Unsupported architecture: $ARCH" >&2; exit 2 ;;
+esac
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "Build dependency '$1' is missing." >&2
+        exit 2
+    }
+}
+for command in python3 curl ldd file find cp; do need "$command"; done
+
+python3 - <<'PY'
+import gi
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gtk
+print(f"==> Bundling Python with GTK {Gtk.get_major_version()}.{Gtk.get_minor_version()}")
+PY
+
+PYTHON="$(readlink -f "$(command -v python3)")"
+PY_VERSION="$($PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+PY_STDLIB="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')"
+GI_DIR="$($PYTHON -c 'import gi, pathlib; print(pathlib.Path(gi.__file__).parent)')"
+MULTIARCH="$($PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("MULTIARCH") or "")')"
+
+GTK_LIB="$(ldconfig -p | awk '/libgtk-4\.so\.1 / {print $NF; exit}')"
+TYPELIB_DIR="/usr/lib/$MULTIARCH/girepository-1.0"
+[ -n "$GTK_LIB" ] && [ -f "$GTK_LIB" ] || { echo "GTK4 runtime not found." >&2; exit 2; }
+[ -d "$TYPELIB_DIR" ] || TYPELIB_DIR="/usr/lib/girepository-1.0"
+[ -d "$TYPELIB_DIR" ] || { echo "GObject typelibs not found." >&2; exit 2; }
+
+echo "==> Preparing self-contained AppDir"
 rm -rf "$APPDIR"
-mkdir -p \
-    "$APPDIR/usr/lib/my-backups" \
-    "$APPDIR/usr/bin" \
-    "$APPDIR/usr/share/applications" \
+mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib/my-backups" \
+    "$APPDIR/usr/lib/python3/dist-packages" "$APPDIR/usr/lib/girepository-1.0" \
+    "$APPDIR/usr/share/applications" "$APPDIR/usr/share/metainfo" \
     "$APPDIR/usr/share/icons/hicolor/scalable/apps"
 
-# 1) App code (keep the package directory so `python3 -m my_backups` works)
-cp -R "$ROOT/my_backups" "$APPDIR/usr/lib/my-backups/"
+cp -a "$ROOT/src/my_backups" "$APPDIR/usr/lib/my-backups/"
+cp -aL "$PYTHON" "$APPDIR/usr/bin/python3"
+cp -a "$PY_STDLIB" "$APPDIR/usr/lib/python$PY_VERSION"
+cp -a "$GI_DIR" "$APPDIR/usr/lib/python3/dist-packages/gi"
+cp -a "$TYPELIB_DIR/." "$APPDIR/usr/lib/girepository-1.0/"
+cp -aL "$(command -v restic)" "$APPDIR/usr/bin/restic"
+cp -aL "$(command -v rclone)" "$APPDIR/usr/bin/rclone"
+cp -aL "$GTK_LIB" "$APPDIR/usr/lib/$(basename "$GTK_LIB")"
 
-# 2) Launcher inside the AppImage + AppRun entry point
-cat > "$APPDIR/usr/bin/my-backups" <<'SH'
-#!/bin/sh
-APP_LIB="$(CDPATH= cd -- "$(dirname "$0")/../lib/my-backups" && pwd)"
-export PYTHONPATH="$APP_LIB${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m my_backups "$@"
-SH
-chmod +x "$APPDIR/usr/bin/my-backups"
-cp "$HERE/AppRun" "$APPDIR/AppRun"
-chmod +x "$APPDIR/AppRun"
-
-# 3) Desktop entry + icon
-#    appimagetool requires a .desktop file at the AppDir root, and the
-#    system menu entry goes under usr/share/applications.
-cp "$HERE/my-backups.desktop" "$APPDIR/my-backups.desktop"
-cp "$HERE/my-backups.desktop" "$APPDIR/usr/share/applications/"
-cp "$ROOT/my_backups/data/icon.svg" \
-    "$APPDIR/usr/share/icons/hicolor/scalable/apps/my-backups.svg"
-cp "$ROOT/my_backups/data/icon.svg" "$APPDIR/my-backups.svg"
-cp "$ROOT/my_backups/data/icon.svg" "$APPDIR/.DirIcon"
-
-# 4) appimagetool (downloaded once into packaging/)
-TOOL="$HERE/appimagetool-$ARCH.AppImage"
-if [ ! -f "$TOOL" ]; then
-    echo "==> Downloading appimagetool…"
-    curl -fL -o "$TOOL" \
-        "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$ARCH.AppImage"
-    chmod +x "$TOOL"
+# GTK loads these resources dynamically, so ldd cannot discover them.
+if [ -d "/usr/lib/$MULTIARCH/gio/modules" ]; then
+    mkdir -p "$APPDIR/usr/lib/gio"
+    cp -a "/usr/lib/$MULTIARCH/gio/modules" "$APPDIR/usr/lib/gio/"
+fi
+for source in "/usr/lib/$MULTIARCH/gdk-pixbuf-2.0" \
+              "/usr/lib/$MULTIARCH/gtk-4.0"; do
+    [ ! -d "$source" ] || cp -a "$source" "$APPDIR/usr/lib/"
+done
+if [ -d /usr/share/glib-2.0/schemas ]; then
+    mkdir -p "$APPDIR/usr/share/glib-2.0"
+    cp -a /usr/share/glib-2.0/schemas "$APPDIR/usr/share/glib-2.0/"
 fi
 
-# 5) Build
-echo "==> Building $OUT"
-ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
+query_loaders="$(command -v gdk-pixbuf-query-loaders 2>/dev/null || true)"
+if [ -z "$query_loaders" ] && \
+   [ -x "/usr/lib/$MULTIARCH/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders" ]; then
+    query_loaders="/usr/lib/$MULTIARCH/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders"
+fi
+if [ -n "$query_loaders" ]; then
+    cp -aL "$query_loaders" "$APPDIR/usr/bin/gdk-pixbuf-query-loaders"
+fi
 
-echo ""
+# Recursively copy shared-library dependencies into one private library path.
+# glibc and the dynamic loader remain supplied by Linux for compatibility.
+declare -A seen=()
+copy_dependencies() {
+    local candidate dependency base changed=0
+    while IFS= read -r -d '' candidate; do
+        file "$candidate" | grep -q 'ELF' || continue
+        while IFS= read -r dependency; do
+            [ -f "$dependency" ] || continue
+            base="$(basename "$dependency")"
+            case "$base" in
+                libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|\
+                libresolv.so.*|libutil.so.*|libanl.so.*|libnss_*.so.*|\
+                ld-linux*.so.*) continue ;;
+            esac
+            if [ -z "${seen[$base]+x}" ]; then
+                seen[$base]=1
+                cp -aL "$dependency" "$APPDIR/usr/lib/$base"
+                changed=1
+            fi
+        done < <(ldd "$candidate" 2>/dev/null | awk \
+            '/=> \// {print $3} /^[[:space:]]*\// {print $1}')
+    done < <(find "$APPDIR/usr/bin" "$APPDIR/usr/lib" -type f -print0)
+    return "$changed"
+}
+while ! copy_dependencies; do :; done
+
+cp "$HERE/AppRun" "$APPDIR/AppRun"
+cp "$HERE/vaultleaf-backup" "$APPDIR/usr/bin/vaultleaf-backup"
+cp "$ROOT/uninstall.sh" "$APPDIR/usr/bin/vaultleaf-uninstall"
+chmod 755 "$APPDIR/AppRun" "$APPDIR/usr/bin/"*
+cp "$HERE/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
+cp "$HERE/$APP_ID.desktop" "$APPDIR/usr/share/applications/"
+cp "$HERE/$APP_ID.metainfo.xml" \
+    "$APPDIR/usr/share/metainfo/$APP_ID.appdata.xml"
+cp "$ROOT/src/my_backups/data/icon.svg" \
+    "$APPDIR/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+cp "$ROOT/src/my_backups/data/icon.svg" "$APPDIR/$APP_ID.svg"
+cp "$ROOT/src/my_backups/data/icon.svg" "$APPDIR/.DirIcon"
+
+TOOL="$HERE/appimagetool-$ARCH.AppImage"
+if [ ! -f "$TOOL" ]; then
+    echo "==> Downloading appimagetool"
+    curl -fL -o "$TOOL" \
+        "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$ARCH.AppImage"
+    chmod 755 "$TOOL"
+fi
+
+echo "==> Verifying the bundled runtime"
+"$APPDIR/AppRun" --version
+PATH=/usr/bin:/bin "$APPDIR/AppRun" --version
+PATH=/usr/bin:/bin "$APPDIR/AppRun" --self-test
+
+echo "==> Building $OUT"
+rm -f "$OUT"
+ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
+chmod 755 "$OUT"
+
 echo "==> Done: $OUT"
-echo "    Run it:            chmod +x \"$OUT\" && \"$OUT\""
-echo "    Install (optional): sudo mkdir -p /opt && sudo cp \"$OUT\" /opt/ && "
-echo "                        ln -s \"/opt/$(basename "$OUT")\" ~/.local/bin/my-backups"
+echo "    No Python, GTK, restic, or rclone installation is required to run it."

@@ -5,6 +5,8 @@ run backups, browse snapshots/logs, restore files, and edit exclusions.
 """
 import gi
 
+from .metadata import VERSION
+
 gi.require_version("Gtk", "4.0")
 
-__version__ = "1.0.0"
+__version__ = VERSION

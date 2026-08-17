@@ -1,10 +1,12 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=VaultLeaf Backup
 GenericName=Backup manager
 Comment=Friendly encrypted backups and safe file recovery
-Exec=my-backups
-Icon=my-backups
+Exec=vaultleaf-backup
+Icon=io.github.dillunholmes.VaultLeafBackup
+StartupWMClass=io.github.dillunholmes.VaultLeafBackup
 Terminal=false
 Categories=Utility;Archiving;FileTools;
 Keywords=backup;restic;rclone;google drive;

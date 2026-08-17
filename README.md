@@ -4,7 +4,7 @@ A native GTK4 backup app built on **restic** and **rclone**. It includes an
 easy setup flow; pre-written scripts and hand-edited systemd units are no
 longer required.
 
-![icon](my_backups/data/icon.svg)
+![icon](src/my_backups/data/icon.svg)
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
@@ -21,6 +21,10 @@ longer required.
   network share, or choose a local/synced folder; then fully customize jobs.
 - **Settings** — direct shortcuts for storage, source, speed, and schedules;
   browse for exclusions; and view upcoming jobs and destinations.
+- **Verified updates** — checks GitHub Releases, selects the correct x86-64 or
+  ARM64 AppImage, verifies its SHA-256 checksum, and keeps the previous version.
+- **Safe uninstall** — removes the app and schedules while preserving backup
+  repositories, encryption keys, settings, and logs.
 
 ## Easy first-run setup
 
@@ -91,16 +95,14 @@ exclude the entire backup source.
 
 ## Requirements
 
-- Ubuntu/GNOME with `python3`, PyGObject and GTK4:
-  ```sh
-  sudo apt install python3-gi gir1.2-gtk-4.0
-  ```
-- `restic`, `rclone`, and FUSE (`fuse3`) for the optional cloud folder.
-- Existing root/system-wide backup setups remain supported.
+The AppImage is self-contained: it includes Python, PyGObject, GTK4, `restic`,
+and `rclone`. The person running it does not install those components. As with
+other AppImages, it needs a 64-bit Linux desktop. FUSE is only needed when using
+the optional mounted cloud-folder feature; local-folder backups and direct
+cloud repositories do not need it.
 
-The setup page can install these components with one administrator prompt on
-APT, DNF, Zypper, Pacman, and APK-based distributions. Normal operation is
-entirely user-owned and does not ask for administrator access again.
+Running directly from the source checkout still requires Python, PyGObject,
+GTK4, `restic`, and `rclone` on the developer's computer.
 
 ## Run (without packaging)
 
@@ -109,7 +111,7 @@ cd "backup llinux app"
 chmod +x run-my-backups.sh   # once
 ./run-my-backups.sh
 # or
-python3 -m my_backups
+PYTHONPATH=src python3 -m my_backups
 ```
 
 For a new machine, the bootstrap installer requests sudo once, installs the
@@ -127,7 +129,36 @@ cd "backup llinux app"
 bash packaging/build-appimage.sh     # needs curl; downloads appimagetool once
 ```
 
-Result: **`VaultLeafBackup-x86_64.AppImage`** in the project root.
+Result: **`VaultLeafBackup-x86_64.AppImage`** in the project root. Build on the
+oldest Linux release you want to support because Linux's core C library cannot
+be safely bundled. Building on Ubuntu 22.04 is a good compatibility baseline.
+
+For a complete release with an AppImage, a no-AppImage-mount portable archive,
+and SHA-256 checksums, run `./packaging/build-release.sh`. See
+[`docs/PORTABILITY.md`](docs/PORTABILITY.md) for the exact compatibility model.
+Use `./packaging/build-compatible.sh` on either native x86-64 or ARM64 Linux to
+make the matching Ubuntu 22.04 baseline release in Docker.
+
+Tagged GitHub releases are built natively for both `x86_64` and `aarch64` by
+`.github/workflows/release.yml`. Set `VERSION` in
+`src/my_backups/metadata.py`, push the matching tag (for example `v1.1.0`), and
+the workflow publishes both architectures and their checksum files.
+
+## Updates and uninstall
+
+Open **Settings → Application → Check for updates**. VaultLeaf downloads only
+the AppImage matching the computer's architecture and refuses to install it if
+the published SHA-256 checksum does not match.
+
+Use **Settings → Application → Uninstall VaultLeaf**, or run:
+
+```sh
+vaultleaf-uninstall
+# or: ./VaultLeafBackup-x86_64.AppImage --uninstall
+```
+
+Uninstalling intentionally keeps encryption keys, settings, logs, and existing
+backup repositories so it cannot make an encrypted backup inaccessible.
 
 ### Install & launch the AppImage
 
@@ -152,8 +183,7 @@ ln -s /opt/VaultLeafBackup-x86_64.AppImage ~/.local/bin/my-backups
   Existing root backup configurations still use `pkexec`.
 - **Restore runs as your user** and writes to the folder you choose
   (default `~/Restored`). Daily, weekly, and monthly snapshots are available.
-- The AppImage uses your system's GTK runtime, so it works on this GNOME
-  machine without bundling gigabytes of libraries.
+- The AppImage carries its own Python, GTK, `restic`, and `rclone` runtime.
 - Setup data is kept in `~/.local/share/my-backups/`; advanced configuration
   is in `~/.config/my-backups/config.json`.
 - Secrets are **not** bundled in the AppImage.

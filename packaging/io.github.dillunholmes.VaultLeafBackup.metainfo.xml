@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.dillunholmes.VaultLeafBackup</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>VaultLeaf Backup</name>
+  <summary>Friendly encrypted backups and safe file recovery</summary>
+  <description>
+    <p>
+      VaultLeaf Backup manages encrypted local, network, and cloud backups
+      through a guided GTK interface powered by restic and rclone.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.dillunholmes.VaultLeafBackup.desktop</launchable>
+  <provides>
+    <binary>vaultleaf-backup</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Archiving</category>
+  </categories>
+  <releases>
+    <release version="1.1.0" date="2026-08-17">
+      <description>
+        <p>Adds native x86-64 and ARM64 releases, verified updates, and safe uninstall.</p>
+      </description>
+    </release>
+  </releases>
+</component>

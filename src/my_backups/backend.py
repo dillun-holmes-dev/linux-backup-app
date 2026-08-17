@@ -20,6 +20,41 @@ import signal
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .metadata import APP_ICON, APP_ID, APP_NAME
+
+_ORIGINAL_RUN = getattr(subprocess, "run")
+_ORIGINAL_POPEN = getattr(subprocess, "Popen")
+
+
+def _child_process_env(explicit=None):
+    """Return an environment without AppImage runtime paths for host tools."""
+    env = dict(os.environ if explicit is None else explicit)
+    system_ld = env.pop("VAULTLEAF_SYSTEM_LD_LIBRARY_PATH", "")
+    system_xdg = env.pop("VAULTLEAF_SYSTEM_XDG_DATA_DIRS", "")
+    for name in ("LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH",
+                 "GI_TYPELIB_PATH", "GIO_EXTRA_MODULES", "GTK_PATH",
+                 "GTK_IM_MODULE", "GDK_PIXBUF_MODULEDIR",
+                 "GDK_PIXBUF_MODULE_FILE"):
+        env.pop(name, None)
+    if system_ld:
+        env["LD_LIBRARY_PATH"] = system_ld
+    if system_xdg:
+        env["XDG_DATA_DIRS"] = system_xdg
+    else:
+        env.pop("XDG_DATA_DIRS", None)
+    return env
+
+
+def _run_process(*args, **kwargs):
+    kwargs["env"] = _child_process_env(kwargs.get("env"))
+    return _ORIGINAL_RUN(*args, **kwargs)
+
+
+def _popen_process(*args, **kwargs):
+    kwargs["env"] = _child_process_env(kwargs.get("env"))
+    return _ORIGINAL_POPEN(*args, **kwargs)
+
+
 CONFIG_PATH = Path.home() / ".config" / "my-backups" / "config.json"
 DATA_DIR = Path.home() / ".local" / "share" / "my-backups"
 USER_UNIT_DIR = Path.home() / ".config" / "systemd" / "user"
@@ -114,7 +149,7 @@ def run(cmd, timeout=30, cwd=None, env_updates=None):
     if env_updates:
         env.update(env_updates)
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True,
+        r = _run_process(cmd, capture_output=True, text=True,
                            timeout=timeout, env=env, cwd=cwd)
         return (r.stdout + r.stderr).strip()
     except Exception:
@@ -158,11 +193,11 @@ def service_running(svc, cfg=None):
             if not key or not shutil.which("pgrep"):
                 return False
             pattern = f"{DATA_DIR / 'run-backup.sh'} {key}"
-            return subprocess.run(["pgrep", "-f", pattern], capture_output=True,
+            return _run_process(["pgrep", "-f", pattern], capture_output=True,
                                   timeout=5).returncode == 0
         cmd = ["systemctl"] + (["--user"] if cfg and cfg.get("systemd_user") else [])
         cmd += ["is-active", svc]
-        out = subprocess.run(cmd,
+        out = _run_process(cmd,
                              capture_output=True, text=True, timeout=10).stdout.strip()
         return out in ("activating", "active")
     except Exception:
@@ -174,14 +209,14 @@ def _systemctl(cfg, *args, timeout=20):
     if cfg.get("systemd_user"):
         cmd.append("--user")
     cmd.extend(args)
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return _run_process(cmd, capture_output=True, text=True, timeout=timeout)
 
 
 def user_systemd_available():
     if not shutil.which("systemctl"):
         return False
     try:
-        return subprocess.run(["systemctl", "--user", "show-environment"],
+        return _run_process(["systemctl", "--user", "show-environment"],
                               capture_output=True, timeout=10).returncode == 0
     except Exception:
         return False
@@ -418,7 +453,7 @@ def run_portable_schedule(cfg):
         runner = DATA_DIR / ("run-integrity.sh" if key == "integrity" else "run-backup.sh")
         args = [str(runner)] + ([] if key == "integrity" else [key])
         try:
-            subprocess.Popen(args, start_new_session=True)
+            _popen_process(args, start_new_session=True)
             state[key] = now.isoformat()
             launched.append(key)
         except OSError:
@@ -435,7 +470,7 @@ def ensure_portable_mount(cfg):
         return True
     mount_dir = cfg["drive_dir"]
     if shutil.which("mountpoint"):
-        if subprocess.run(["mountpoint", "-q", mount_dir],
+        if _run_process(["mountpoint", "-q", mount_dir],
                           capture_output=True).returncode == 0:
             return True
     profile = SPEED_PROFILES.get(cfg.get("speed_profile"), SPEED_PROFILES["balanced"])
@@ -450,7 +485,7 @@ def ensure_portable_mount(cfg):
     if cfg.get("storage_mode") == "oauth":
         cmd += ["--drive-chunk-size", profile["chunk"]]
     try:
-        return subprocess.run(cmd, capture_output=True, timeout=40).returncode == 0
+        return _run_process(cmd, capture_output=True, timeout=40).returncode == 0
     except Exception:
         return False
 
@@ -543,7 +578,7 @@ def configure_smb_remote(config_path, remote, host, share, user, password, domai
         cmd.append("smb")
     cmd += ["host", host, "user", user, "domain", domain]
     if password:
-        obscured = subprocess.run(
+        obscured = _run_process(
             ["rclone", "obscure", "-"], input=password + "\n", capture_output=True,
             text=True, timeout=15).stdout.strip()
         if not obscured:
@@ -552,21 +587,21 @@ def configure_smb_remote(config_path, remote, host, share, user, password, domai
     elif remote not in existing:
         cmd += ["pass", "", "--no-obscure"]
     env = {**os.environ, "RCLONE_CONFIG": str(config_path)}
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+    result = _run_process(cmd, capture_output=True, text=True, timeout=30, env=env)
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "Could not save the SMB connection")
     config_file = Path(config_path)
     if config_file.exists():
         os.chmod(config_file, 0o600)
     root = f"{remote}:{share}"
-    check = subprocess.run(["rclone", "lsd", root], capture_output=True, text=True,
+    check = _run_process(["rclone", "lsd", root], capture_output=True, text=True,
                            timeout=45, env=env)
     if check.returncode:
         raise RuntimeError(check.stderr.strip() or
                            "Could not connect. Check the server, share, and login.")
     if write_marker:
         marker = f"{root}/.my-backups-storage"
-        check = subprocess.run(["rclone", "touch", marker], capture_output=True,
+        check = _run_process(["rclone", "touch", marker], capture_output=True,
                                text=True, timeout=45, env=env)
         if check.returncode:
             raise RuntimeError(check.stderr.strip() or
@@ -586,12 +621,12 @@ def test_smb_connection(config_path, host, share, user, password, domain):
             write_marker=False)
         env = {**os.environ, "RCLONE_CONFIG": str(temp_config)}
         probe = f"{configured['root']}/.vaultleaf-write-test-{secrets.token_hex(6)}"
-        written = subprocess.run(["rclone", "touch", probe], capture_output=True,
+        written = _run_process(["rclone", "touch", probe], capture_output=True,
                                  text=True, timeout=45, env=env)
         if written.returncode:
             raise RuntimeError(written.stderr.strip() or
                                "Connected, but this account cannot write to the share")
-        subprocess.run(["rclone", "deletefile", probe], capture_output=True,
+        _run_process(["rclone", "deletefile", probe], capture_output=True,
                        text=True, timeout=30, env=env)
     return f"Connected to {configured['root']} successfully."
 
@@ -606,7 +641,7 @@ def test_saved_smb_connection(cfg):
         raise ValueError("The saved SMB connection is missing; enter the password again")
     root = f"{remote}:{share}"
     env = {**os.environ, "RCLONE_CONFIG": cfg["rclone_config"]}
-    check = subprocess.run(["rclone", "lsd", root], capture_output=True, text=True,
+    check = _run_process(["rclone", "lsd", root], capture_output=True, text=True,
                            timeout=45, env=env)
     if check.returncode:
         raise RuntimeError(check.stderr.strip() or "Could not connect to the saved SMB share")
@@ -627,7 +662,7 @@ def open_rclone_config(config_path=None, on_done=None):
             try:
                 env = os.environ.copy()
                 env["RCLONE_CONFIG"] = str(config_path or DEFAULTS["rclone_config"])
-                proc = subprocess.Popen(cmd, env=env)
+                proc = _popen_process(cmd, env=env)
                 if on_done:
                     threading.Thread(target=lambda: (proc.wait(), on_done()),
                                      daemon=True).start()
@@ -651,7 +686,7 @@ def create_google_drive_remote(name, config_path, on_done):
         try:
             env = os.environ.copy()
             env["RCLONE_CONFIG"] = str(config_path or DEFAULTS["rclone_config"])
-            result = subprocess.run(
+            result = _run_process(
                 ["rclone", "config", "create", name, "drive", "scope", "drive",
                  "config_is_local", "true"],
                 capture_output=True, text=True, timeout=600, env=env)
@@ -700,7 +735,7 @@ def create_google_drive_remote_with_client(name, config_path, json_path, on_done
         try:
             env = os.environ.copy()
             env["RCLONE_CONFIG"] = str(config_path or DEFAULTS["rclone_config"])
-            result = subprocess.run(
+            result = _run_process(
                 ["rclone", "config", "create", name, "drive", "scope", "drive",
                  "client_id", client_id, "client_secret", client_secret,
                  "config_is_local", "true"], capture_output=True, text=True,
@@ -761,7 +796,7 @@ fi
 
     def work():
         try:
-            result = subprocess.run(["pkexec", str(script)], capture_output=True,
+            result = _run_process(["pkexec", str(script)], capture_output=True,
                                     text=True, timeout=1800)
             ok = result.returncode == 0
             message = ("Required components are installed." if ok else
@@ -821,27 +856,112 @@ def _install_autostart():
                    f"exec {shlex.quote(sys.executable)} -m my_backups \"$@\"\n")
     _write_private(launcher, "#!/bin/sh\n" + command, executable=True)
     desktop_exec = '"' + str(launcher).replace("\\", "\\\\").replace('"', '\\"') + '"'
-    autostart = Path.home() / ".config" / "autostart" / "my-backups.desktop"
+    autostart = Path.home() / ".config" / "autostart" / f"{APP_ID}.desktop"
     autostart.parent.mkdir(parents=True, exist_ok=True)
     autostart.write_text(
-        "[Desktop Entry]\nType=Application\nName=VaultLeaf Backup\n"
-        f"Exec={desktop_exec} --background\nIcon=drive-harddisk\n"
+        f"[Desktop Entry]\nType=Application\nName={APP_NAME}\n"
+        f"Exec={desktop_exec} --background\nIcon={APP_ICON}\n"
+        f"StartupWMClass={APP_ID}\n"
         "X-GNOME-Autostart-enabled=true\nNoDisplay=true\n")
-    menu_entry = Path.home() / ".local" / "share" / "applications" / "my-backups.desktop"
+    menu_entry = (Path.home() / ".local" / "share" / "applications" /
+                  f"{APP_ID}.desktop")
     menu_entry.parent.mkdir(parents=True, exist_ok=True)
     menu_entry.write_text(
-        "[Desktop Entry]\nType=Application\nName=VaultLeaf Backup\n"
+        f"[Desktop Entry]\nType=Application\nName={APP_NAME}\n"
         "Comment=Automatic restic and rclone backups\n"
-        f"Exec={desktop_exec}\nIcon=drive-harddisk\nCategories=Utility;System;\n")
+        f"Exec={desktop_exec}\nIcon={APP_ICON}\nStartupWMClass={APP_ID}\n"
+        "Categories=Utility;System;\n")
+    icon_dir = (Path.home() / ".local" / "share" / "icons" / "hicolor" /
+                "scalable" / "apps")
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(Path(__file__).parent / "data" / "icon.svg",
+                 icon_dir / f"{APP_ICON}.svg")
+    bundled_bin = os.environ.get("VAULTLEAF_BUNDLED_BIN")
+    if bundled_bin:
+        uninstaller = Path(bundled_bin) / "vaultleaf-uninstall"
+        if uninstaller.is_file():
+            local_bin = Path.home() / ".local" / "bin"
+            local_bin.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(uninstaller, local_bin / "vaultleaf-uninstall")
+            os.chmod(local_bin / "vaultleaf-uninstall", 0o755)
+
+
+def _install_bundled_tools():
+    """Keep AppImage CLI tools available to timers after it is unmounted."""
+    bundled = os.environ.get("VAULTLEAF_BUNDLED_BIN")
+    if not bundled:
+        return None
+    source_dir = Path(bundled)
+    tool_dir = DATA_DIR / "bin"
+    tool_dir.mkdir(parents=True, exist_ok=True)
+    copied = False
+    for name in ("restic", "rclone"):
+        source = source_dir / name
+        if source.is_file():
+            target = tool_dir / name
+            shutil.copy2(source, target)
+            os.chmod(target, 0o755)
+            copied = True
+    return tool_dir if copied else None
+
+
+def launch_application(path):
+    """Launch an updated AppImage with a clean host environment."""
+    _popen_process([str(path)], start_new_session=True)
+
+
+def uninstall_application():
+    """Remove user-level integration while preserving configuration and backups."""
+    unit_names = [
+        "my-backups-daily.timer", "my-backups-weekly.timer",
+        "my-backups-monthly.timer", "my-backups-integrity.timer",
+        "my-backups-rclone.service",
+    ]
+    if user_systemd_available():
+        _run_process(["systemctl", "--user", "disable", "--now", *unit_names],
+                     capture_output=True, timeout=60)
+    for stem in ("daily", "weekly", "monthly", "integrity"):
+        for suffix in ("service", "timer"):
+            (USER_UNIT_DIR / f"my-backups-{stem}.{suffix}").unlink(missing_ok=True)
+    (USER_UNIT_DIR / "my-backups-rclone.service").unlink(missing_ok=True)
+    if user_systemd_available():
+        _run_process(["systemctl", "--user", "daemon-reload"],
+                     capture_output=True, timeout=20)
+
+    home = Path.home()
+    paths = [
+        home / ".config" / "autostart" / f"{APP_ID}.desktop",
+        home / ".config" / "autostart" / "my-backups.desktop",
+        home / ".local" / "share" / "applications" / f"{APP_ID}.desktop",
+        home / ".local" / "share" / "applications" / "my-backups.desktop",
+        home / ".local" / "share" / "icons" / "hicolor" / "scalable" /
+        "apps" / f"{APP_ICON}.svg",
+        home / ".local" / "bin" / "my-backups",
+        home / ".local" / "bin" / "vaultleaf-backup",
+        home / ".local" / "bin" / "vaultleaf-uninstall",
+    ]
+    for path in paths:
+        path.unlink(missing_ok=True)
+    shutil.rmtree(home / ".local" / "lib" / "my-backups", ignore_errors=True)
+    shutil.rmtree(DATA_DIR / "bin", ignore_errors=True)
+    for name in ("run-backup.sh", "run-integrity.sh", "start-app.sh",
+                 "install-dependencies.sh"):
+        (DATA_DIR / name).unlink(missing_ok=True)
+    return ("VaultLeaf was removed. Backup repositories, encryption keys, "
+            "settings, and logs were preserved.")
 
 
 def _install_user_units(cfg, daily_time, weekly_day, weekly_time, mount_remote=None):
     has_systemd = user_systemd_available()
     USER_UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    bundled_tools = _install_bundled_tools()
+    timer_path = (f"{bundled_tools}:/usr/local/bin:/usr/bin:/bin"
+                  if bundled_tools else "/usr/local/bin:/usr/bin:/bin")
     runner = DATA_DIR / "run-backup.sh"
     q = shlex.quote
     script = f'''#!/bin/sh
 set -eu
+export PATH={q(timer_path)}
 kind="$1"
 case "$kind" in
   daily) repo={q(cfg["repos"]["daily"])}; output={q(cfg["daily_json"])}; log={q(cfg["daily_log"])} ;;
@@ -880,6 +1000,7 @@ restic --password-file {q(cfg["pwfile"])} -r "$repo" backup {q(cfg["backup_sourc
     integrity_runner = DATA_DIR / "run-integrity.sh"
     integrity_script = f'''#!/bin/sh
 set -u
+export PATH={q(timer_path)}
 export RCLONE_CONFIG={q(cfg["rclone_config"])}
 export RCLONE_TRANSFERS={SPEED_PROFILES[cfg.get("speed_profile", "balanced")]["transfers"]}
 export RCLONE_CHECKERS={SPEED_PROFILES[cfg.get("speed_profile", "balanced")]["checkers"]}
@@ -988,7 +1109,7 @@ After=network-online.target
 
 [Service]
 Type=notify
-ExecStart={_unit_quote(shutil.which("rclone") or "/usr/bin/rclone")} mount {_unit_quote(mount_remote)} {_unit_quote(cfg["drive_dir"])} --config {_unit_quote(cfg["rclone_config"])} --cache-dir {_unit_quote(cache_dir)} --vfs-cache-mode writes --dir-cache-time 5m --transfers {profile["transfers"]} --checkers {profile["checkers"]}{backend_option} --retries 10 --low-level-retries 20 --timeout 5m
+ExecStart={_unit_quote(str((bundled_tools / "rclone") if bundled_tools else (shutil.which("rclone") or "/usr/bin/rclone")))} mount {_unit_quote(mount_remote)} {_unit_quote(cfg["drive_dir"])} --config {_unit_quote(cfg["rclone_config"])} --cache-dir {_unit_quote(cache_dir)} --vfs-cache-mode writes --dir-cache-time 5m --transfers {profile["transfers"]} --checkers {profile["checkers"]}{backend_option} --retries 10 --low-level-retries 20 --timeout 5m
 ExecStop={_unit_quote(unmount)} -uz {_unit_quote(cfg["drive_dir"])}
 Restart=on-failure
 RestartSec=10
@@ -999,7 +1120,7 @@ WantedBy=default.target
         _write_private(mount_unit, mount)
     elif mount_unit.exists():
         if has_systemd:
-            subprocess.run(["systemctl", "--user", "disable", "--now",
+            _run_process(["systemctl", "--user", "disable", "--now",
                             "my-backups-rclone.service"], capture_output=True, timeout=20)
         mount_unit.unlink()
 
@@ -1007,7 +1128,7 @@ WantedBy=default.target
         _install_autostart()
         return False
 
-    r = subprocess.run(["systemctl", "--user", "daemon-reload"],
+    r = _run_process(["systemctl", "--user", "daemon-reload"],
                        capture_output=True, text=True, timeout=20)
     if r.returncode:
         raise RuntimeError(r.stderr.strip() or "Could not reload the user service manager")
@@ -1017,22 +1138,22 @@ WantedBy=default.target
                    ("integrity", "my-backups-integrity.timer"))
     for key, unit in timer_units:
         if not cfg.get("schedule_enabled", {}).get(key, True):
-            subprocess.run(["systemctl", "--user", "disable", "--now", unit],
+            _run_process(["systemctl", "--user", "disable", "--now", unit],
                            capture_output=True, text=True, timeout=30)
             continue
-        r = subprocess.run(["systemctl", "--user", "enable", "--now", unit],
+        r = _run_process(["systemctl", "--user", "enable", "--now", unit],
                            capture_output=True, text=True, timeout=30)
         if r.returncode:
             raise RuntimeError(r.stderr.strip() or f"Could not enable {unit}")
-        subprocess.run(["systemctl", "--user", "restart", unit],
+        _run_process(["systemctl", "--user", "restart", unit],
                        capture_output=True, text=True, timeout=30)
     if mount_remote:
-        r = subprocess.run(["systemctl", "--user", "enable", "--now",
+        r = _run_process(["systemctl", "--user", "enable", "--now",
                             "my-backups-rclone.service"], capture_output=True,
                            text=True, timeout=40)
         if r.returncode:
             raise RuntimeError(r.stderr.strip() or "Could not start the cloud mount")
-        r = subprocess.run(["systemctl", "--user", "restart",
+        r = _run_process(["systemctl", "--user", "restart",
                             "my-backups-rclone.service"], capture_output=True,
                            text=True, timeout=40)
         if r.returncode:
@@ -1093,7 +1214,7 @@ def apply_setup(current_cfg, mode, source, location, daily_time="21:00",
         remote = location.strip().rstrip(":")
         if remote not in configured_drive_remotes(cfg["rclone_config"]):
             raise ValueError("Choose a configured Google Drive account first")
-        check = subprocess.run(["rclone", "lsd", f"{remote}:"], capture_output=True,
+        check = _run_process(["rclone", "lsd", f"{remote}:"], capture_output=True,
                                text=True, timeout=30,
                                env={**os.environ, "RCLONE_CONFIG": cfg["rclone_config"]})
         if check.returncode:
@@ -1206,7 +1327,7 @@ def start_backup(cfg, key, on_done=None):
     def _run():
         if cfg.get("scheduler_backend") == "internal":
             try:
-                subprocess.Popen([str(DATA_DIR / "run-backup.sh"), key],
+                _popen_process([str(DATA_DIR / "run-backup.sh"), key],
                                  start_new_session=True)
                 if on_done:
                     on_done(True, f"Started {key} backup")
@@ -1229,7 +1350,7 @@ def start_backup(cfg, key, on_done=None):
         for cmd in (["pkexec", "systemctl", "start", svc],
                     ["sudo", "systemctl", "start", svc]):
             try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                r = _run_process(cmd, capture_output=True, text=True, timeout=120)
                 if r.returncode == 0:
                     if on_done:
                         on_done(True, f"Started {svc}")
@@ -1246,7 +1367,7 @@ def start_integrity_check(cfg, on_done=None):
     def work():
         try:
             if cfg.get("scheduler_backend") == "internal":
-                subprocess.Popen([str(DATA_DIR / "run-integrity.sh")],
+                _popen_process([str(DATA_DIR / "run-integrity.sh")],
                                  start_new_session=True)
                 ok, message = True, "Integrity check started in the background."
             else:
@@ -1265,7 +1386,7 @@ def start_integrity_check(cfg, on_done=None):
 def open_folder(path):
     for cmd in (["xdg-open", path], ["gio", "open", path]):
         try:
-            subprocess.Popen(cmd)
+            _popen_process(cmd)
             return
         except Exception:
             continue
@@ -1323,7 +1444,7 @@ class RestoreJob:
         env["RCLONE_CONFIG"] = self.cfg["rclone_config"]
         last_shown = -1.0
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+            proc = _popen_process(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True, env=env)
             self._proc = proc
             for raw in proc.stdout:

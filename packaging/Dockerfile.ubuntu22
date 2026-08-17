@@ -1,0 +1,11 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash binutils coreutils curl file findutils gawk libc-bin \
+    python3 python3-gi gir1.2-gtk-4.0 \
+    libgdk-pixbuf2.0-bin ibus-gtk4 restic rclone ca-certificates tar gzip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+ENTRYPOINT ["./packaging/build-release.sh"]
