@@ -184,8 +184,9 @@ appreciated! 🙏
 
 ## Acknowledgements
 
-Thanks to **Andrew Tennant** for the inspiration behind VaultLeaf Backup —
-what started as a collection of shell scripts became a proper app. 🙌
+Thanks to [**Crypticat**](https://github.com/Crypticat) for the inspiration
+behind VaultLeaf Backup — what started as a collection of shell scripts
+became a proper app. 🙌
 
 ## License
 
