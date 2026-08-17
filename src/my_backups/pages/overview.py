@@ -81,6 +81,7 @@ class OverviewPage(Gtk.Box):
     def refresh(self):
         now = time.time()
         runs = []
+        recoveries = []
         for key, svc in self.cfg["services"].items():
             jpath = self.cfg[key + "_json"]
             running = B.service_running(svc, self.cfg)
@@ -99,10 +100,17 @@ class OverviewPage(Gtk.Box):
                 card["det"].set_label("Manual backups are still available")
             if running:
                 runs.append(key)
+            elif incomplete:
+                recoveries.append(key)
         if runs:
             rate = sum(self._rate.get(k, 0) for k in runs)
             self.banner.set_label(
                 f"● RUNNING: {', '.join(runs).upper()}   ·   {rate / 1e6:.0f} MB/s")
+            self.banner.add_css_class("error")
+            self.banner.remove_css_class("success")
+        elif recoveries:
+            self.banner.set_label(
+                f"● RECOVERY PENDING — continuing {', '.join(recoveries).upper()} automatically")
             self.banner.add_css_class("error")
             self.banner.remove_css_class("success")
         else:

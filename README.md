@@ -14,6 +14,8 @@ longer required.
 - **Overview** — live progress bars for daily, weekly, and monthly backups, upload speed,
   ETA, storage information, manual **Back up now** controls, interrupted-backup
   continuation, and the next scheduled runs.
+- **Automatic recovery** — detects an existing backup plan and resumes an
+  interrupted job after login, retrying with a safe delay until it completes.
 - **Backups & logs** — snapshot lists for daily, weekly, and monthly repositories plus
   live logs.
 - **Restore** — a guided, overwrite-safe recovery flow with friendly dates,
@@ -175,6 +177,12 @@ On desktops that require it, right-click the download and choose
 user-local copy and menu icon automatically. Later double-clicks open the
 already-running window; a newer downloaded AppImage replaces the older
 installed copy.
+
+If VaultLeaf was already configured, a newer AppImage automatically uses the
+existing storage, source folder, encryption key, exclusions, and schedules.
+There is no second setup wizard. If the computer shuts down during a backup,
+VaultLeaf continues that job after the next login and keeps retrying until a
+complete snapshot is recorded.
 
 ## Notes
 

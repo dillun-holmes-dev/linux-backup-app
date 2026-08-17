@@ -7,6 +7,7 @@ visible page from the backend so progress is always live.
 import ctypes
 import sys
 import threading
+import time
 from pathlib import Path
 
 from gi.repository import Gdk, Gio, GLib, Gtk
@@ -166,6 +167,9 @@ class BackupApplication(Gtk.Application):
         self._last_integrity = None
         self._held = False
         self._tick_count = 0
+        self._resume_scan_running = False
+        self._resume_attempts = {}
+        self._resume_after = {}
         self.add_main_option("background", 0, GLib.OptionFlags.NONE,
                              GLib.OptionArg.NONE, "Start hidden in the tray", None)
 
@@ -213,8 +217,26 @@ class BackupApplication(Gtk.Application):
         self._background_start = False
 
     def _start_portable_services(self):
+        try:
+            migrated = B.migrate_existing_setup(self.cfg)
+            if migrated:
+                GLib.idle_add(self._existing_setup_notice)
+        except OSError:
+            pass
         B.ensure_portable_mount(self.cfg)
         B.run_portable_schedule(self.cfg)
+        self._resume_interrupted_backups()
+
+    def _existing_setup_notice(self):
+        text = ("Your existing backup plan was found and is ready. "
+                "You do not need to set it up again.")
+        if self.window is not None and self.window.get_visible():
+            self.window.toast(text)
+        notice = Gio.Notification.new("Existing VaultLeaf setup loaded")
+        notice.set_body(text)
+        notice.add_button("Open VaultLeaf", "app.show")
+        self.send_notification("existing-setup-loaded", notice)
+        return False
 
     def _check_available_update(self):
         try:
@@ -240,8 +262,81 @@ class BackupApplication(Gtk.Application):
         if self._tick_count % 60 == 0:
             threading.Thread(target=B.ensure_portable_mount,
                              args=(self.cfg,), daemon=True).start()
+            self._schedule_resume_scan()
         self._check_integrity()
         return True
+
+    def _schedule_resume_scan(self):
+        if self._resume_scan_running or not self.cfg.get("setup_complete"):
+            return
+        self._resume_scan_running = True
+
+        def scan():
+            try:
+                self._resume_interrupted_backups()
+            finally:
+                self._resume_scan_running = False
+        threading.Thread(target=scan, daemon=True).start()
+
+    def _resume_interrupted_backups(self):
+        """Resume one interrupted job at a time, retrying until it completes."""
+        if not self.cfg.get("setup_complete"):
+            return
+        services = self.cfg.get("services", {})
+        running = {key: B.service_running(svc, self.cfg)
+                   for key, svc in services.items()}
+        if any(running.values()):
+            return
+        now = time.monotonic()
+        for key in ("daily", "weekly", "monthly"):
+            if key not in services:
+                continue
+            if not B.backup_incomplete(self.cfg, key, running=False):
+                was_resuming = self._resume_attempts.pop(key, None) is not None
+                self._resume_after.pop(key, None)
+                if was_resuming:
+                    GLib.idle_add(self._automatic_resume_complete, key)
+                continue
+            if now < self._resume_after.get(key, 0):
+                continue
+            attempt = self._resume_attempts.get(key, 0) + 1
+            # Retry quickly once, then back off to avoid hammering unavailable
+            # storage while still continuing automatically until completion.
+            delay = min(1800, (60, 300, 900, 1800)[min(attempt - 1, 3)])
+            self._resume_attempts[key] = attempt
+            self._resume_after[key] = now + delay
+
+            def started(ok, message, backup_key=key):
+                GLib.idle_add(self._automatic_resume_notice,
+                              backup_key, ok, message)
+            B.start_backup(self.cfg, key, on_done=started)
+            return
+
+    def _automatic_resume_notice(self, key, ok, message):
+        if ok:
+            text = (f"Continuing the interrupted {key} backup automatically. "
+                    "VaultLeaf will keep retrying until it finishes.")
+            notice = Gio.Notification.new("Interrupted backup is continuing")
+            notice.set_body(text)
+            notice.add_button("Open VaultLeaf", "app.show")
+            self.send_notification(f"resume-{key}", notice)
+            if self.window is not None and self.window.get_visible():
+                self.window.toast(text)
+        elif self.window is not None and self.window.get_visible():
+            self.window.toast(
+                f"Could not continue {key} yet. VaultLeaf will retry. {message}",
+                "error")
+        return False
+
+    def _automatic_resume_complete(self, key):
+        text = f"The interrupted {key} backup finished successfully."
+        notice = Gio.Notification.new("Backup recovery complete")
+        notice.set_body(text)
+        notice.add_button("Open VaultLeaf", "app.show")
+        self.send_notification(f"resume-{key}", notice)
+        if self.window is not None and self.window.get_visible():
+            self.window.toast(text)
+        return False
 
     def show_main_window(self):
         if self.window is None:

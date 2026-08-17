@@ -10,6 +10,29 @@ from my_backups.metadata import APP_ID
 
 
 class UninstallTest(unittest.TestCase):
+    def test_existing_setup_migrates_launchers_without_touching_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            legacy_dir = home / ".local" / "lib" / "my-backups"
+            legacy_dir.mkdir(parents=True)
+            legacy_app = legacy_dir / "MyBackups.AppImage"
+            legacy_app.write_text("old app")
+            data = home / ".local" / "share" / "my-backups"
+            data.mkdir(parents=True)
+            key = data / "restic-passphrase.txt"
+            key.write_text("keep me")
+
+            with patch.object(backend.Path, "home", return_value=home), \
+                 patch.object(backend, "_install_autostart") as install, \
+                 patch.object(backend, "_write_backup_runner") as runner:
+                self.assertTrue(backend.migrate_existing_setup(
+                    {"setup_complete": True}))
+
+            install.assert_called_once()
+            runner.assert_called_once()
+            self.assertFalse(legacy_app.exists())
+            self.assertEqual(key.read_text(), "keep me")
+
     def test_uninstall_preserves_config_keys_and_logs(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

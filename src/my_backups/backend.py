@@ -957,6 +957,31 @@ def _install_autostart():
             os.chmod(local_bin / "vaultleaf-uninstall", 0o755)
 
 
+def migrate_existing_setup(cfg):
+    """Reuse an existing plan and point its launchers at the stable AppImage."""
+    if not cfg.get("setup_complete"):
+        return False
+    home = Path.home()
+    # These are exact legacy integration files, never backup data or config.
+    legacy_paths = (
+            home / ".config" / "autostart" / "my-backups.desktop",
+            home / ".local" / "share" / "applications" / "my-backups.desktop",
+            home / ".local" / "lib" / "my-backups" / "MyBackups.AppImage")
+    migrated = any(path.exists() for path in legacy_paths)
+    _install_autostart()
+    for legacy in legacy_paths:
+        legacy.unlink(missing_ok=True)
+    try:
+        (home / ".local" / "lib" / "my-backups").rmdir()
+    except OSError:
+        pass
+    # Refresh only the generated runner. This adds interruption tracking to an
+    # old plan without restarting timers, mounts, or an active backup.
+    bundled_tools = DATA_DIR / "bin"
+    _write_backup_runner(cfg, bundled_tools if bundled_tools.is_dir() else None)
+    return migrated
+
+
 def _install_bundled_tools():
     """Keep AppImage CLI tools available to timers after it is unmounted."""
     bundled = os.environ.get("VAULTLEAF_BUNDLED_BIN")
@@ -1025,10 +1050,8 @@ def uninstall_application():
             "settings, and logs were preserved.")
 
 
-def _install_user_units(cfg, daily_time, weekly_day, weekly_time, mount_remote=None):
-    has_systemd = user_systemd_available()
-    USER_UNIT_DIR.mkdir(parents=True, exist_ok=True)
-    bundled_tools = _install_bundled_tools()
+def _write_backup_runner(cfg, bundled_tools=None):
+    """Write the interruption-aware runner without changing schedules."""
     timer_path = (f"{bundled_tools}:/usr/local/bin:/usr/bin:/bin"
                   if bundled_tools else "/usr/local/bin:/usr/bin:/bin")
     runner = DATA_DIR / "run-backup.sh"
@@ -1088,6 +1111,17 @@ restic --password-file {q(cfg["pwfile"])} -r "$repo" backup {q(cfg["backup_sourc
   --json >"$output" 2>>"$log"
 '''
     _write_private(runner, script, executable=True)
+    return runner
+
+
+def _install_user_units(cfg, daily_time, weekly_day, weekly_time, mount_remote=None):
+    has_systemd = user_systemd_available()
+    USER_UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    bundled_tools = _install_bundled_tools()
+    timer_path = (f"{bundled_tools}:/usr/local/bin:/usr/bin:/bin"
+                  if bundled_tools else "/usr/local/bin:/usr/bin:/bin")
+    runner = _write_backup_runner(cfg, bundled_tools)
+    q = shlex.quote
 
     integrity_runner = DATA_DIR / "run-integrity.sh"
     integrity_script = f'''#!/bin/sh
