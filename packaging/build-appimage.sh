@@ -13,6 +13,8 @@ APP_ID="io.github.dillunholmes.VaultLeafBackup"
 ARCH="${ARCH:-$(uname -m)}"
 APPDIR="$HERE/build/AppDir"
 OUT="$ROOT/$APP_NAME-$ARCH.AppImage"
+MINISIGN_VERSION="0.12"
+MINISIGN_ARCHIVE_SHA256="9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73"
 
 case "$ARCH" in
     x86_64|aarch64) ;;
@@ -61,6 +63,18 @@ cp -a "$TYPELIB_DIR/." "$APPDIR/usr/lib/girepository-1.0/"
 cp -aL "$(command -v restic)" "$APPDIR/usr/bin/restic"
 cp -aL "$(command -v rclone)" "$APPDIR/usr/bin/rclone"
 cp -aL "$GTK_LIB" "$APPDIR/usr/lib/$(basename "$GTK_LIB")"
+
+# Pin and hash-check the official static verifier used for secure updates.
+MINISIGN_ARCHIVE="$HERE/minisign-$MINISIGN_VERSION-linux.tar.gz"
+if [ ! -f "$MINISIGN_ARCHIVE" ]; then
+    echo "==> Downloading minisign $MINISIGN_VERSION"
+    curl --proto '=https' --tlsv1.2 -fL -o "$MINISIGN_ARCHIVE" \
+        "https://github.com/jedisct1/minisign/releases/download/$MINISIGN_VERSION/minisign-$MINISIGN_VERSION-linux.tar.gz"
+fi
+echo "$MINISIGN_ARCHIVE_SHA256  $MINISIGN_ARCHIVE" | sha256sum -c -
+tar -xOf "$MINISIGN_ARCHIVE" "minisign-linux/$ARCH/minisign" \
+    >"$APPDIR/usr/bin/minisign"
+chmod 755 "$APPDIR/usr/bin/minisign"
 
 # GTK loads these resources dynamically, so ldd cannot discover them.
 if [ -d "/usr/lib/$MULTIARCH/gio/modules" ]; then
@@ -144,4 +158,4 @@ ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" "$OUT"
 chmod 755 "$OUT"
 
 echo "==> Done: $OUT"
-echo "    No Python, GTK, restic, or rclone installation is required to run it."
+echo "    No Python, GTK, restic, rclone, or minisign installation is required."

@@ -28,6 +28,8 @@ class UpdateTest(unittest.TestCase):
                  "browser_download_url": "https://example.invalid/app"},
                 {"name": "SHA256SUMS-aarch64",
                  "browser_download_url": "https://example.invalid/sums"},
+                {"name": "SHA256SUMS-aarch64.minisig",
+                 "browser_download_url": "https://example.invalid/signature"},
             ],
         }
         with patch.object(updates, "_request_json", return_value=payload), \
@@ -40,21 +42,41 @@ class UpdateTest(unittest.TestCase):
         digest = hashlib.sha256(new_content).hexdigest()
         release = updates.ReleaseInfo(
             version="1.1.0", page_url="", appimage_name="VaultLeafBackup-x86_64.AppImage",
-            appimage_url="app", checksum_url="sums")
+            appimage_url="app", checksum_url="sums",
+            checksum_signature_url="signature")
 
         def fake_download(url, target):
-            Path(target).write_bytes(
-                new_content if url == "app" else
-                f"{digest}  {release.appimage_name}\n".encode())
+            if url == "app":
+                Path(target).write_bytes(new_content)
+            elif url == "sums":
+                Path(target).write_text(f"{digest}  {release.appimage_name}\n")
+            else:
+                Path(target).write_text("signed manifest")
 
         with tempfile.TemporaryDirectory() as directory:
             current = Path(directory) / "VaultLeaf.AppImage"
             current.write_bytes(b"old-appimage")
             with patch.dict(os.environ, {"APPIMAGE": str(current)}), \
-                 patch.object(updates, "_download", side_effect=fake_download):
+                 patch.object(updates, "_download", side_effect=fake_download), \
+                 patch.object(updates, "_verify_release_signature") as verify:
                 installed = updates.install_release(release)
+            verify.assert_called_once()
             self.assertEqual(installed.read_bytes(), new_content)
             self.assertEqual(Path(str(current) + ".previous").read_bytes(), b"old-appimage")
+
+    def test_invalid_publisher_signature_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            verifier = Path(directory) / "minisign"
+            verifier.write_text("placeholder")
+            checksum = Path(directory) / "SHA256SUMS"
+            signature = Path(directory) / "SHA256SUMS.minisig"
+            checksum.touch()
+            signature.touch()
+            with patch.dict(os.environ, {"VAULTLEAF_BUNDLED_BIN": directory}), \
+                 patch.object(updates.subprocess, "run",
+                              return_value=type("Result", (), {"returncode": 1})()):
+                with self.assertRaisesRegex(RuntimeError, "signature is invalid"):
+                    updates._verify_release_signature(checksum, signature)
 
 
 if __name__ == "__main__":

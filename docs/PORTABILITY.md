@@ -1,6 +1,7 @@
 # Linux portability
 
 VaultLeaf releases include their own Python, PyGObject, GTK4, restic, rclone,
+Minisign verifier,
 typelibs, image loaders, GLib schemas, and dynamically loaded GTK modules.
 They never execute a system Python interpreter.
 
@@ -35,3 +36,10 @@ assets for both architectures without CPU emulation.
 On a native x86-64 or ARM64 Docker-capable development machine, run
 `./packaging/build-compatible.sh`. The script selects the matching Ubuntu 22.04
 container and refuses accidental CPU emulation.
+
+## Release authenticity
+
+Each architecture has a signed checksum manifest. The updater verifies its
+Ed25519 publisher signature before trusting any digest. GitHub Actions also
+attests the AppImage and portable archive so their repository and build
+workflow can be independently checked. See `SECURITY.md` for commands.
