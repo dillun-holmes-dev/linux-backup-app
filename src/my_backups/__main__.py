@@ -42,5 +42,9 @@ if __name__ == "__main__":
         application.cache.stop()
         print("VaultLeaf GTK interface: OK")
         sys.exit(0)
+    # A downloaded AppImage installs itself to one stable location. Executing
+    # that stable copy then either opens the existing GTK instance or starts it.
+    from .bootstrap import handoff_to_installed_appimage
+    handoff_to_installed_appimage()
     from .app import main
     sys.exit(main())

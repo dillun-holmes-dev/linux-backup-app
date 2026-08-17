@@ -12,7 +12,8 @@ longer required.
 ## Features
 
 - **Overview** — live progress bars for daily, weekly, and monthly backups, upload speed,
-  ETA, storage information, and the next scheduled runs.
+  ETA, storage information, manual **Back up now** controls, interrupted-backup
+  continuation, and the next scheduled runs.
 - **Backups & logs** — snapshot lists for daily, weekly, and monthly repositories plus
   live logs.
 - **Restore** — a guided, overwrite-safe recovery flow with friendly dates,
@@ -22,7 +23,8 @@ longer required.
 - **Settings** — direct shortcuts for storage, source, speed, and schedules;
   browse for exclusions; and view upcoming jobs and destinations.
 - **Verified updates** — checks GitHub Releases, selects the correct x86-64 or
-  ARM64 AppImage, verifies its SHA-256 checksum, and keeps the previous version.
+  ARM64 AppImage, verifies its SHA-256 checksum, and atomically replaces the
+  single installed copy.
 - **Safe uninstall** — removes the app and schedules while preserving backup
   repositories, encryption keys, settings, and logs.
 
@@ -115,13 +117,10 @@ chmod +x run-my-backups.sh   # once
 PYTHONPATH=src python3 -m my_backups
 ```
 
-For a new machine, the bootstrap installer requests sudo once, installs the
-right dependencies, installs the app under `~/.local`, and launches it:
-
-```sh
-chmod +x install.sh
-./install.sh
-```
+On a new machine, download the AppImage for that computer's CPU and run it.
+VaultLeaf places one stable executable under `~/.local`, removes older
+VaultLeaf AppImage downloads, creates its application-menu entry, and opens.
+No Python installation or administrator password is needed.
 
 ## Build the AppImage
 
@@ -171,15 +170,11 @@ chmod +x VaultLeafBackup-x86_64.AppImage
 ./VaultLeafBackup-x86_64.AppImage    # just run it, or
 ```
 
-To get an app-menu entry + icon on Ubuntu 22.04+:
-**right-click the AppImage → “Allow Launching”**, then double-click it.
-Or install it system-wide:
-
-```sh
-sudo cp VaultLeafBackup-x86_64.AppImage /opt/
-sudo chmod +x /opt/VaultLeafBackup-x86_64.AppImage
-ln -s /opt/VaultLeafBackup-x86_64.AppImage ~/.local/bin/my-backups
-```
+On desktops that require it, right-click the download and choose
+**Allow Launching**, then double-click it. The first run installs the stable
+user-local copy and menu icon automatically. Later double-clicks open the
+already-running window; a newer downloaded AppImage replaces the older
+installed copy.
 
 ## Notes
 

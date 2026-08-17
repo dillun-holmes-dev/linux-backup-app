@@ -37,7 +37,7 @@ class UpdateTest(unittest.TestCase):
             release = updates.check_latest_release()
         self.assertEqual(release.appimage_name, "VaultLeafBackup-aarch64.AppImage")
 
-    def test_verified_update_keeps_previous_version(self):
+    def test_verified_update_atomically_replaces_single_installed_copy(self):
         new_content = b"new-appimage"
         digest = hashlib.sha256(new_content).hexdigest()
         release = updates.ReleaseInfo(
@@ -62,7 +62,7 @@ class UpdateTest(unittest.TestCase):
                 installed = updates.install_release(release)
             verify.assert_called_once()
             self.assertEqual(installed.read_bytes(), new_content)
-            self.assertEqual(Path(str(current) + ".previous").read_bytes(), b"old-appimage")
+            self.assertFalse(Path(str(current) + ".previous").exists())
 
     def test_invalid_publisher_signature_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -184,9 +184,9 @@ class BackupApplication(Gtk.Application):
         self._held = True
         self.cache.start()
         self._add_action("refresh", lambda: self.window and self.window.refresh_all())
-        self._add_action("run-daily", lambda: self._run_backup("daily"))
-        self._add_action("run-weekly", lambda: self._run_backup("weekly"))
-        self._add_action("run-monthly", lambda: self._run_backup("monthly"))
+        self._add_action("run-daily", lambda: self.run_backup("daily"))
+        self._add_action("run-weekly", lambda: self.run_backup("weekly"))
+        self._add_action("run-monthly", lambda: self.run_backup("monthly"))
         self._add_action("run-integrity", self._run_integrity)
         self._add_action("open-drive", lambda: B.open_folder(self.cfg["drive_dir"]))
         self._add_action("change-storage", lambda: self._open_setup(1))
@@ -344,9 +344,15 @@ class BackupApplication(Gtk.Application):
         dialog.connect("response", lambda dlg, *_: dlg.destroy())
         dialog.present()
 
-    def _run_backup(self, key):
+    def run_backup(self, key):
+        # start_backup checks active services in its worker thread; inspecting
+        # the saved state here therefore cannot stall the GTK event loop.
+        continuing = B.backup_incomplete(self.cfg, key, running=False)
         def on_done(ok, msg):
             if self.window is not None:
+                if ok and continuing:
+                    msg = (f"Continuing the {key} backup. Already uploaded data "
+                           "will be reused safely.")
                 GLib.idle_add(self.window.toast, msg, "error" if not ok else "info")
         B.start_backup(self.cfg, key, on_done=on_done)
 

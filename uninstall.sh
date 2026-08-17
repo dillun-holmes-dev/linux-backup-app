@@ -27,7 +27,8 @@ rm -f "$USER_UNITS/my-backups-rclone.service" \
       "$HOME/.local/bin/vaultleaf-uninstall" \
       "$DATA_DIR/run-backup.sh" "$DATA_DIR/run-integrity.sh" \
       "$DATA_DIR/start-app.sh" "$DATA_DIR/install-dependencies.sh"
-rm -rf "$HOME/.local/lib/my-backups" "$DATA_DIR/bin"
+rm -rf "$HOME/.local/lib/my-backups" "$HOME/.local/lib/vaultleaf-backup" \
+       "$DATA_DIR/bin"
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload >/dev/null 2>&1 || true
