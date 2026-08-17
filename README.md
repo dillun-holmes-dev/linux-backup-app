@@ -176,11 +176,12 @@ workflow.
 
 ## Support
 
-If VaultLeaf Backup keeps your files safe (and your stress levels down),
-consider sponsoring the project on GitHub — every bit is genuinely
-appreciated! 🙏
+VaultLeaf Backup is free and open source. If you'd like to support the
+project, you can sponsor it on GitHub:
 
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
+
+Sponsorship is entirely optional.
 
 ## Acknowledgements
 
