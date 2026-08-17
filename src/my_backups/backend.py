@@ -101,6 +101,7 @@ DEFAULTS = {
                  "monthly": "backup-monthly.service"},
     "schedule_enabled": {"daily": True, "weekly": True, "monthly": True,
                          "integrity": True},
+    "services_stopped": False,
     "timers": {
         "Daily": "backup-daily.timer",
         "Weekly": "backup-weekly.timer",
@@ -1892,6 +1893,53 @@ visudo -c >/dev/null
         if on_done:
             on_done(ok, message)
     threading.Thread(target=work, daemon=True).start()
+
+
+def services_stopped(cfg):
+    # True when the user has completely paused the backup services.
+    return bool(cfg.get("services_stopped"))
+
+
+def shutdown_services(cfg):
+    """Completely stop scheduled backups and the cloud mount.
+
+    Disables every timer/service and remembers the previous schedule so it can
+    be resumed later. Manual 'Back up now' buttons still work.
+    """
+    if cfg.get("scheduler_backend") == "systemd" and user_systemd_available():
+        for key in ("daily", "weekly", "monthly", "integrity"):
+            _systemctl(cfg, "disable", "--now", f"my-backups-{key}.timer", timeout=30)
+            _systemctl(cfg, "stop", f"my-backups-{key}.service", timeout=30)
+        _systemctl(cfg, "disable", "--now", "my-backups-rclone.service", timeout=30)
+    cfg["schedule_backup"] = json.loads(json.dumps(
+        cfg.get("schedule_enabled", {})))
+    for key in ("daily", "weekly", "monthly", "integrity"):
+        cfg["schedule_enabled"][key] = False
+    cfg["services_stopped"] = True
+    save_config(cfg)
+    return True
+
+
+def resume_services(cfg):
+    """Restore the schedule that was active before shutdown."""
+    if not cfg.get("services_stopped"):
+        return False
+    previous = cfg.get("schedule_backup") or {}
+    for key in ("daily", "weekly", "monthly", "integrity"):
+        cfg["schedule_enabled"][key] = bool(previous.get(key, True))
+    cfg["services_stopped"] = False
+    cfg.pop("schedule_backup", None)
+    save_config(cfg)
+    if cfg.get("scheduler_backend") == "systemd" and user_systemd_available():
+        sched = cfg.get("schedule", {})
+        try:
+            _install_user_units(
+                cfg, sched.get("daily_time", "21:00"),
+                sched.get("weekly_day", "Sun"), sched.get("weekly_time", "20:00"),
+                mount_remote=cfg.get("mount_source") or None)
+        except Exception:  # noqa: BLE001
+            pass
+    return True
 
 
 def open_folder(path):

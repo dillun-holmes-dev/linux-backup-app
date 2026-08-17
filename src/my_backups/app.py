@@ -76,6 +76,8 @@ class BackupWindow(Gtk.ApplicationWindow):
         menu.append("Change storage", "app.change-storage")
         menu.append("Change schedule", "app.change-schedule")
         menu.append("Open storage folder", "app.open-drive")
+        menu.append("Shut down backup services", "app.shutdown-services")
+        menu.append("Resume backup services", "app.resume-services")
         menu.append("Refresh", "app.refresh")
         mb = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu)
         hb.pack_end(mb)
@@ -199,6 +201,8 @@ class BackupApplication(Gtk.Application):
         self._add_action("show", self.show_main_window)
         self._add_action("tray-controller", self.show_tray_controller)
         self._add_action("quit-from-tray", self._quit_from_tray)
+        self._add_action("shutdown-services", self._shutdown_services)
+        self._add_action("resume-services", self._resume_services)
 
     def do_activate(self):
         if self.window is None:
@@ -372,7 +376,7 @@ class BackupApplication(Gtk.Application):
             self.tray_window.present()
             return False
         win = Gtk.ApplicationWindow(application=self, title="VaultLeaf — Background")
-        win.set_default_size(320, 140)
+        win.set_default_size(340, 300)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         box.set_margin_top(16)
         box.set_margin_bottom(16)
@@ -381,10 +385,17 @@ class BackupApplication(Gtk.Application):
         box.append(Gtk.Label(label="VaultLeaf Backup is running in the background.", wrap=True))
         open_btn = Gtk.Button(label="Open VaultLeaf Backup")
         open_btn.connect("clicked", lambda *_: self.show_main_window())
+        shutdown_btn = Gtk.Button(label="Shut down backup services completely")
+        shutdown_btn.add_css_class("destructive-action")
+        shutdown_btn.connect("clicked", lambda *_: self._shutdown_services())
+        resume_btn = Gtk.Button(label="Resume backup services")
+        resume_btn.connect("clicked", lambda *_: self._resume_services())
         quit_btn = Gtk.Button(label="Quit background app")
         quit_btn.add_css_class("destructive-action")
         quit_btn.connect("clicked", lambda *_: self._quit_from_tray())
         box.append(open_btn)
+        box.append(shutdown_btn)
+        box.append(resume_btn)
         box.append(quit_btn)
         win.set_child(box)
         win.connect("destroy", self._tray_window_destroyed)
@@ -411,6 +422,34 @@ class BackupApplication(Gtk.Application):
             self._held = False
         self.quit()
         return False
+
+    def _shutdown_services(self):
+        def work():
+            try:
+                B.shutdown_services(self.cfg)
+                ok, message = True, "All backup services stopped. Schedules are paused."
+            except Exception as exc:  # noqa: BLE001
+                ok, message = False, f"Could not stop services: {exc}"
+            GLib.idle_add(self._services_changed, ok, message)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _resume_services(self):
+        def work():
+            try:
+                resumed = B.resume_services(self.cfg)
+                ok, message = ((True, "Backup services resumed.")
+                               if resumed else (False, "Services were not stopped."))
+            except Exception as exc:  # noqa: BLE001
+                ok, message = False, f"Could not resume services: {exc}"
+            GLib.idle_add(self._services_changed, ok, message)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _services_changed(self, ok, message):
+        if self.tray_window is not None:
+            self.tray_window.destroy()
+        if self.window is not None:
+            self.window.refresh_all()
+            GLib.idle_add(self.window.toast, message, "info" if ok else "error")
 
     def _run_integrity(self):
         def done(ok, message):

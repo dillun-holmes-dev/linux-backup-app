@@ -111,7 +111,8 @@ class SetupPage(Gtk.Box):
         self._refresh_remotes()
         self._mode_changed()
         self._auth_mode_changed()
-        self._set_step(0)
+        self._set_step(0 if not self.cfg.get("setup_complete")
+                       else len(self.STEP_NAMES) - 1)
 
     def _new_page(self, title, subtitle):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -574,6 +575,8 @@ class SetupPage(Gtk.Box):
             "Review and finish",
             "Check the summary below. Use Back to change anything. Applying updates schedules "
             "safely and never deletes existing backup snapshots.")
+        self.review_heading = page.get_first_child()
+        self.review_subtitle = page.get_child_at_index(1)
         review_frame, review_box = self._frame("Your backup plan")
         self.review_label = Gtk.Label(label="", xalign=0, wrap=True, selectable=True)
         review_box.append(self.review_label)
@@ -590,6 +593,16 @@ class SetupPage(Gtk.Box):
         self.wizard.add_named(wrapper, "step-4")
 
     def _update_review(self):
+        if self.cfg.get("setup_complete"):
+            self.review_heading.set_label("Setup complete")
+            self.review_subtitle.set_label(
+                "Your backup plan is already configured and running. Review it "
+                "below - change anything, then press Save changes.")
+        else:
+            self.review_heading.set_label("Review and finish")
+            self.review_subtitle.set_label(
+                "Check the summary below. Use Back to change anything. Applying "
+                "updates schedules safely and never deletes existing snapshots.")
         if self.mode.get_selected() == 0:
             mode = "Google Drive — " + (self._selected_remote() or "no account selected")
         elif self.mode.get_selected() == 1:
