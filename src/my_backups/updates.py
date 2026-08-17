@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import subprocess
 import tempfile
 from urllib.request import Request, urlopen
 
@@ -25,6 +26,7 @@ class ReleaseInfo:
     appimage_name: str
     appimage_url: str
     checksum_url: str
+    checksum_signature_url: str
 
 
 def normalized_arch(machine=None):
@@ -58,16 +60,20 @@ def check_latest_release():
     arch = normalized_arch()
     appimage_name = f"VaultLeafBackup-{arch}.AppImage"
     checksum_name = f"SHA256SUMS-{arch}"
+    signature_name = f"{checksum_name}.minisig"
     assets = {item.get("name"): item.get("browser_download_url")
               for item in payload.get("assets", [])}
-    if ((appimage_name not in assets or checksum_name not in assets) and
+    if ((appimage_name not in assets or checksum_name not in assets or
+         signature_name not in assets) and
             is_newer(version)):
-        raise RuntimeError(f"Release {version or 'unknown'} has no {arch} application")
+        raise RuntimeError(
+            f"Release {version or 'unknown'} has no signed {arch} application")
     return ReleaseInfo(version=version,
                        page_url=payload.get("html_url", ""),
                        appimage_name=appimage_name,
                        appimage_url=assets.get(appimage_name, ""),
-                       checksum_url=assets.get(checksum_name, ""))
+                       checksum_url=assets.get(checksum_name, ""),
+                       checksum_signature_url=assets.get(signature_name, ""))
 
 
 def _download(url, target):
@@ -86,6 +92,25 @@ def _expected_checksum(text, filename):
     raise RuntimeError("The release checksum file is invalid")
 
 
+def _verify_release_signature(checksum_file, signature_file):
+    """Require the checksum manifest to be signed by the VaultLeaf release key."""
+    bundled = Path(os.environ.get("VAULTLEAF_BUNDLED_BIN", ""))
+    verifier = bundled / "minisign"
+    public_key = Path(__file__).with_name("data") / "vaultleaf-minisign.pub"
+    if not verifier.is_file() or not public_key.is_file():
+        raise RuntimeError("The bundled release signature verifier is unavailable")
+    try:
+        result = subprocess.run(
+            [str(verifier), "-Vm", str(checksum_file), "-x",
+             str(signature_file), "-p", str(public_key), "-q"],
+            capture_output=True, text=True, timeout=15, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise RuntimeError("Could not verify the update publisher signature") from error
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Update rejected: the release publisher signature is invalid")
+
+
 def install_release(release):
     """Download, verify, and atomically replace the running AppImage."""
     current = os.environ.get("APPIMAGE")
@@ -99,9 +124,12 @@ def install_release(release):
                                      dir=target.parent) as directory:
         temporary = Path(directory) / release.appimage_name
         checksum_file = Path(directory) / "SHA256SUMS"
-        _download(release.appimage_url, temporary)
+        signature_file = Path(directory) / "SHA256SUMS.minisig"
         _download(release.checksum_url, checksum_file)
+        _download(release.checksum_signature_url, signature_file)
+        _verify_release_signature(checksum_file, signature_file)
         expected = _expected_checksum(checksum_file.read_text(), release.appimage_name)
+        _download(release.appimage_url, temporary)
         hasher = hashlib.sha256()
         with open(temporary, "rb") as downloaded:
             for chunk in iter(lambda: downloaded.read(1024 * 1024), b""):

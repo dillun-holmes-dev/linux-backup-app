@@ -18,7 +18,7 @@ if __name__ == "__main__":
         bundled = Path(os.environ.get("VAULTLEAF_BUNDLED_BIN", ""))
         if Gtk.get_major_version() != 4:
             raise RuntimeError("Bundled GTK4 is unavailable")
-        for command in ("restic", "rclone"):
+        for command in ("restic", "rclone", "minisign"):
             if not (bundled / command).is_file():
                 raise RuntimeError(f"Bundled {command} is unavailable")
         print("VaultLeaf bundled runtime: OK")

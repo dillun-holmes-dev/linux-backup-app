@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -21,7 +23,7 @@ jobs:
             arch: aarch64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -42,7 +44,28 @@ jobs:
         run: |
           ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --version
           ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --self-test
-      - uses: actions/upload-artifact@v4
+      - name: Sign checksum manifest
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          test -n "$MINISIGN_SECRET_KEY"
+          signing_key="$(mktemp)"
+          trap 'shred -u "$signing_key" 2>/dev/null || true' EXIT
+          printf '%s' "$MINISIGN_SECRET_KEY" >"$signing_key"
+          packaging/build/AppDir/usr/bin/minisign -S -W \
+            -s "$signing_key" \
+            -m "dist/SHA256SUMS-${{ matrix.arch }}" \
+            -x "dist/SHA256SUMS-${{ matrix.arch }}.minisig" \
+            -t "VaultLeaf Backup ${GITHUB_REF_NAME} ${{ matrix.arch }}"
+          packaging/build/AppDir/usr/bin/minisign -Vm \
+            "dist/SHA256SUMS-${{ matrix.arch }}" \
+            -x "dist/SHA256SUMS-${{ matrix.arch }}.minisig" \
+            -p src/my_backups/data/vaultleaf-minisign.pub
+      - name: Attest release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/*${{ matrix.arch }}*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: VaultLeafBackup-${{ matrix.arch }}
           path: dist/*${{ matrix.arch }}*
@@ -53,10 +76,17 @@ jobs:
     needs: build
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
+      - name: Verify build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for artifact in dist/*.AppImage dist/*-portable.tar.gz; do
+            gh attestation verify "$artifact" --repo "$GITHUB_REPOSITORY"
+          done
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -96,7 +96,8 @@ exclude the entire backup source.
 ## Requirements
 
 The AppImage is self-contained: it includes Python, PyGObject, GTK4, `restic`,
-and `rclone`. The person running it does not install those components. As with
+`rclone`, and the update signature verifier. The person running it does not
+install those components. As with
 other AppImages, it needs a 64-bit Linux desktop. FUSE is only needed when using
 the optional mounted cloud-folder feature; local-folder backups and direct
 cloud repositories do not need it.
@@ -142,13 +143,16 @@ make the matching Ubuntu 22.04 baseline release in Docker.
 Tagged GitHub releases are built natively for both `x86_64` and `aarch64` by
 `.github/workflows/release.yml`. Set `VERSION` in
 `src/my_backups/metadata.py`, push the matching tag (for example `v1.1.0`), and
-the workflow publishes both architectures and their checksum files.
+the workflow publishes both architectures, signed checksum files, release
+notes, and verifiable build provenance.
 
 ## Updates and uninstall
 
 Open **Settings → Application → Check for updates**. VaultLeaf downloads only
-the AppImage matching the computer's architecture and refuses to install it if
-the published SHA-256 checksum does not match.
+the AppImage matching the computer's architecture. It first authenticates the
+release manifest with the embedded VaultLeaf publisher key, then refuses to
+install the file if its SHA-256 checksum does not match. See
+[`SECURITY.md`](SECURITY.md) for manual signature and provenance verification.
 
 Use **Settings → Application → Uninstall VaultLeaf**, or run:
 
