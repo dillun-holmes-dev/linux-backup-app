@@ -982,8 +982,27 @@ def migrate_existing_setup(cfg):
     return migrated
 
 
+def _tool_version(path):
+    """Return the dotted version tuple of a CLI tool (empty on failure)."""
+    for args in (["--version"], ["version"]):
+        try:
+            result = _run_process([str(path), *args], capture_output=True,
+                                  text=True, timeout=20)
+            match = re.search(r"(\d+(?:\.\d+)+)", result.stdout + result.stderr)
+            if match:
+                return tuple(int(part) for part in match.group(1).split("."))
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return ()
+
+
 def _install_bundled_tools():
-    """Keep AppImage CLI tools available to timers after it is unmounted."""
+    """Keep CLI tools available to timers after the AppImage is unmounted.
+
+    Install the newest available version of each tool so a stale bundled
+    binary (e.g. an old restic that cannot read current repository formats)
+    never shadows a newer system copy, and vice versa.
+    """
     bundled = os.environ.get("VAULTLEAF_BUNDLED_BIN")
     if not bundled:
         return None
@@ -992,12 +1011,28 @@ def _install_bundled_tools():
     tool_dir.mkdir(parents=True, exist_ok=True)
     copied = False
     for name in ("restic", "rclone"):
-        source = source_dir / name
-        if source.is_file():
-            target = tool_dir / name
-            shutil.copy2(source, target)
-            os.chmod(target, 0o755)
-            copied = True
+        candidates = []
+        bundled_candidate = source_dir / name
+        if bundled_candidate.is_file():
+            candidates.append((_tool_version(bundled_candidate), bundled_candidate))
+        for directory in ("/usr/local/bin", "/usr/bin", "/bin"):
+            system_candidate = Path(directory) / name
+            if system_candidate.is_file():
+                candidates.append((_tool_version(system_candidate), system_candidate))
+        if not candidates:
+            continue
+        best_version, best_path = max(candidates, key=lambda item: item[0])
+        installed = tool_dir / name
+        if installed.is_file() and _tool_version(installed) == best_version:
+            continue
+        temporary = installed.with_name(f".{installed.name}.{os.getpid()}.tmp")
+        try:
+            shutil.copy2(best_path, temporary)
+            os.chmod(temporary, 0o755)
+            os.replace(temporary, installed)
+        finally:
+            temporary.unlink(missing_ok=True)
+        copied = True
     return tool_dir if copied else None
 
 
