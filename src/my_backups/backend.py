@@ -5,6 +5,7 @@ same battle-tested logic (live progress, snapshots, timers, launch).
 All blocking work (restic/rclone calls) happens in background threads so
 the UI never freezes.
 """
+import fnmatch
 import json
 import os
 import re
@@ -87,6 +88,9 @@ DEFAULTS = {
     "smb_user": "",
     "smb_domain": "WORKGROUP",
     "mount_source": "",
+    "monthly_mode": "restic",
+    "system_disk": "",
+    "system_image_dir": "MyBackups/system-images",
     "integrity_json": f"{DATA_DIR}/state/integrity.json",
     "integrity_log": f"{DATA_DIR}/logs/integrity.log",
     "repos": {"daily": "rclone:gdrive:MyBackups/repositories/daily",
@@ -760,6 +764,28 @@ def google_client_credentials(json_path):
         raise ValueError("Choose a Google Desktop OAuth client JSON file") from exc
 
 
+def find_oauth_client_files():
+    # Find Google Desktop OAuth client JSON files in common folders. These are
+    # downloaded from Google Cloud Console and are usually named
+    # client_secret_<id>.json inside Downloads/Desktop/Documents.
+    folders = (Path.home() / "Downloads", Path.home() / "Desktop",
+               Path.home() / "Documents", Path.home(), DATA_DIR)
+    found, seen = [], set()
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        try:
+            for candidate in folder.glob("client_secret*.json"):
+                if candidate.is_file():
+                    key = str(candidate.resolve())
+                    if key not in seen:
+                        seen.add(key)
+                        found.append(key)
+        except OSError:
+            continue
+    return sorted(found)
+
+
 def create_google_drive_remote_with_client(name, config_path, json_path, on_done):
     """Create a Drive remote using the user's own Google API OAuth client."""
     try:
@@ -1131,6 +1157,69 @@ def uninstall_application():
             "settings, and logs were preserved.")
 
 
+def detect_system_disk():
+    """Return the block device that holds the root filesystem (e.g. /dev/nvme0n1)."""
+    try:
+        result = _run_process(["findmnt", "-n", "-o", "SOURCE", "/"],
+                              capture_output=True, text=True, timeout=10)
+        source = result.stdout.strip()
+        if not source or not source.startswith("/dev/"):
+            return ""
+        parent = _run_process(["lsblk", "-no", "PKNAME", source],
+                              capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+        return f"/dev/{parent}" if parent else source
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _write_system_image_runner(cfg, tool_dir=None):
+    """Write the runner that streams a bootable image of the OS disk."""
+    timer_path = (f"{tool_dir}:/usr/local/bin:/usr/bin:/bin"
+                  if tool_dir else "/usr/local/bin:/usr/bin:/bin")
+    runner = DATA_DIR / "run-system-image.sh"
+    q = shlex.quote
+    disk = (cfg.get("system_disk") or "").strip() or detect_system_disk()
+    remote = cfg.get("rclone_remote") or "gdrive"
+    dest = cfg.get("system_image_dir") or "MyBackups/system-images"
+    output = cfg["monthly_json"]
+    log = cfg["monthly_log"]
+    script = f'''#!/bin/sh
+set -eu
+export PATH={q(timer_path)}
+export RCLONE_CONFIG={q(cfg["rclone_config"])}
+disk={q(disk)}
+remote={q(remote)}
+dest={q(dest)}
+output={q(output)}
+log={q(log)}
+mkdir -p "$(dirname "$output")" "$(dirname "$log")"
+if [ "$(id -u)" -ne 0 ]; then
+  exec pkexec "$0"
+fi
+if ! command -v zstd >/dev/null 2>&1; then
+  echo "zstd is required (install it first)." >>"$log"
+  exit 4
+fi
+if [ -z "$disk" ] || [ ! -b "$disk" ]; then
+  echo "No system disk found. Open Settings and set it (e.g. /dev/nvme0n1)." >>"$log"
+  exit 3
+fi
+stamp="$(date +%Y-%m-%d_%H-%M)"
+target="{q(remote)}:{q(dest)}/$stamp/system.img.zst"
+echo "Imaging $disk -> $target" >>"$log"
+dd if="$disk" bs=4M status=progress 2>>"$log" | \\
+  zstd -T0 -3 -c 2>>"$log" | \\
+  rclone rcat "{q(remote)}:{q(dest)}/$stamp/system.img.zst" \\
+    --config {q(cfg["rclone_config"])} --progress 2>>"$log"
+code=$?
+printf '{{"state":"complete","stamp":"%s","target":"%s","exit_code":%s}}\\n' "$stamp" "$target" "$code" >"$output"
+exit "$code"
+'''
+    _write_private(runner, script, executable=True)
+    return runner
+
+
 def _write_backup_runner(cfg, bundled_tools=None):
     """Write the interruption-aware runner without changing schedules."""
     timer_path = (f"{bundled_tools}:/usr/local/bin:/usr/bin:/bin"
@@ -1202,6 +1291,8 @@ def _install_user_units(cfg, daily_time, weekly_day, weekly_time, mount_remote=N
     timer_path = (f"{bundled_tools}:/usr/local/bin:/usr/bin:/bin"
                   if bundled_tools else "/usr/local/bin:/usr/bin:/bin")
     runner = _write_backup_runner(cfg, bundled_tools)
+    if cfg.get("monthly_mode") == "system_image":
+        _write_system_image_runner(cfg, bundled_tools)
     q = shlex.quote
 
     integrity_runner = DATA_DIR / "run-integrity.sh"
@@ -1248,7 +1339,16 @@ mv "$tmp" "$output"
 
     for key, description in (("daily", "Daily"), ("weekly", "Weekly"),
                              ("monthly", "Monthly")):
-        mount_want = " my-backups-rclone.service" if mount_remote else ""
+        is_image = (key == "monthly" and
+                    cfg.get("monthly_mode") == "system_image")
+        if is_image:
+            exec_program = _unit_quote(str(DATA_DIR / "run-system-image.sh"))
+            exec_args = ""
+            mount_want = ""
+        else:
+            exec_program = _unit_quote(runner)
+            exec_args = f" {key}"
+            mount_want = " my-backups-rclone.service" if mount_remote else ""
         service = f'''[Unit]
 Description=VaultLeaf {description.lower()} backup
 After=network-online.target my-backups-rclone.service
@@ -1257,7 +1357,7 @@ Wants=network-online.target{mount_want}
 [Service]
 Type=oneshot
 TimeoutStartSec=infinity
-ExecStart={_unit_quote(runner)} {key}
+ExecStart={exec_program}{exec_args}
 '''
         if key == "daily":
             timer_value = _calendar(None, daily_time)
@@ -1374,7 +1474,7 @@ def apply_setup(current_cfg, mode, source, location, daily_time="21:00",
                 google_client_mode="shared", monthly_day="1", monthly_time="02:00",
                 integrity_day="Mon", integrity_time="03:00", daily_enabled=True,
                 weekly_enabled=True, monthly_enabled=True, integrity_enabled=True,
-                smb_config=None):
+                monthly_mode="restic", system_disk="", smb_config=None):
     """Validate choices, create stable storage, and install persistent timers."""
     if not shutil.which("restic"):
         raise RuntimeError("restic is not installed")
@@ -1400,6 +1500,13 @@ def apply_setup(current_cfg, mode, source, location, daily_time="21:00",
             raise ValueError("Choose a monthly day from 1–28 or last day") from exc
     if speed_profile not in SPEED_PROFILES:
         raise ValueError("Choose a valid connection speed")
+    if monthly_mode not in ("restic", "system_image"):
+        raise ValueError("Choose a valid monthly backup type")
+    system_disk = (system_disk or "").strip()
+    if monthly_mode == "system_image" and not system_disk:
+        system_disk = detect_system_disk()
+    if system_disk and not Path(system_disk).exists():
+        raise ValueError(f"System disk {system_disk} does not exist")
 
     cfg = json.loads(json.dumps(current_cfg))
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -1506,6 +1613,9 @@ def apply_setup(current_cfg, mode, source, location, daily_time="21:00",
                              "weekly": bool(weekly_enabled),
                              "monthly": bool(monthly_enabled),
                              "integrity": bool(integrity_enabled)},
+        "monthly_mode": monthly_mode,
+        "system_disk": system_disk,
+        "system_image_dir": cfg.get("system_image_dir") or "MyBackups/system-images",
     })
     # Revalidate manually edited exclusions against the newly selected source.
     save_excludes(cfg, get_excludes(cfg))
@@ -1599,6 +1709,133 @@ def start_integrity_check(cfg, on_done=None):
             ok, message = False, str(exc)
         if on_done:
             on_done(ok, message)
+    threading.Thread(target=work, daemon=True).start()
+
+
+def _replica_snapshot_files(cfg, repo):
+    """Return the set of regular file paths in the latest snapshot."""
+    snapshots = run(["restic", "--password-file", cfg["pwfile"], "-r", repo,
+                     "snapshots", "--json", "--latest", "1"], timeout=120,
+                    env_updates={"RCLONE_CONFIG": cfg["rclone_config"]})
+    try:
+        latest = json.loads(snapshots or "[]")
+    except ValueError:
+        return None
+    if not latest:
+        return None
+    snap_id = latest[0].get("id")
+    try:
+        proc = _popen_process(
+            ["restic", "--password-file", cfg["pwfile"], "-r", repo,
+             "ls", "--json", snap_id],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            env={"RCLONE_CONFIG": cfg["rclone_config"]})
+    except OSError:
+        return set()
+    files = set()
+    for line in proc.stdout:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if item.get("type") in ("d", "dir"):
+            continue
+        path = item.get("path") or item.get("name")
+        if path:
+            files.add(str(path).lstrip("/"))
+    proc.stdout.close()
+    proc.wait()
+    return files
+
+
+def _replica_source_files(cfg):
+    """Walk the selected folder (honouring exclusions) and return file paths."""
+    source = Path(cfg["backup_source"]).expanduser().resolve()
+    drive = Path(cfg["drive_dir"]).expanduser().resolve()
+    data = DATA_DIR.resolve()
+    matchers = []
+    try:
+        for line in Path(cfg["excludes_file"]).read_text().splitlines():
+            value = line.strip()
+            if value and not value.startswith("#"):
+                matchers.append(value)
+    except OSError:
+        pass
+
+    def ignored(path):
+        text = str(path)
+        for base in (str(drive), str(data)):
+            if base and (text == base or text.startswith(base + os.sep)):
+                return True
+        return False
+
+    def excluded(rel):
+        parts = rel.split("/")
+        for index in range(1, len(parts) + 1):
+            candidate = "/".join(parts[:index])
+            for pattern in matchers:
+                if fnmatch.fnmatch(candidate, pattern):
+                    return True
+        return False
+
+    files = set()
+    for dirpath, dirnames, filenames in os.walk(source):
+        if ignored(dirpath):
+            dirnames[:] = []
+            continue
+        keep = []
+        for name in dirnames:
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, source).replace(os.sep, "/")
+            if ignored(full) or excluded(rel):
+                continue
+            keep.append(name)
+        dirnames[:] = keep
+        for name in filenames:
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, source).replace(os.sep, "/")
+            if ignored(full) or excluded(rel):
+                continue
+            files.add(rel)
+    return files
+
+
+def verify_replica(cfg, key, on_done=None):
+    """Compare the selected folder against the latest snapshot (background).
+
+    Confirms the cloud/network backup is a 100% replica of the folder: any
+    file that exists on one side but not the other is reported.
+    """
+    def work():
+        try:
+            if key not in ("daily", "weekly", "monthly"):
+                raise ValueError(f"Unknown backup type: {key}")
+            if key == "monthly" and cfg.get("monthly_mode") == "system_image":
+                raise ValueError("Monthly uses a bootable system image, not a "
+                                 "restic repo - nothing to compare")
+            repo = cfg["repos"].get(key)
+            if not repo:
+                raise ValueError("No repository configured for this backup")
+            snap = _replica_snapshot_files(cfg, repo)
+            if snap is None:
+                raise ValueError(f"No {key} snapshots yet - run the backup first")
+            local = _replica_source_files(cfg)
+            missing_from_backup = sorted(local - snap)
+            missing_locally = sorted(snap - local)
+            ok = not missing_from_backup and not missing_locally
+            if ok:
+                message = (f"Replica check ({key}): 100% match. "
+                           f"{len(local):,} local files are all in the backup.")
+            else:
+                message = (f"Replica check ({key}): {len(local):,} local vs "
+                           f"{len(snap):,} in backup. "
+                           f"{len(missing_from_backup):,} not in backup, "
+                           f"{len(missing_locally):,} in backup but gone locally.")
+            if on_done:
+                on_done(ok, message)
+        except Exception as exc:  # noqa: BLE001
+            if on_done:
+                on_done(False, str(exc))
     threading.Thread(target=work, daemon=True).start()
 
 

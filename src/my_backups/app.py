@@ -461,6 +461,13 @@ class BackupApplication(Gtk.Application):
                 GLib.idle_add(self.window.toast, msg, "error" if not ok else "info")
         B.start_backup(self.cfg, key, on_done=on_done)
 
+    def verify_replica(self, key):
+        def on_done(ok, message):
+            if self.window is not None:
+                GLib.idle_add(self.window.toast, message,
+                              "error" if not ok else "info")
+        B.verify_replica(self.cfg, key, on_done=on_done)
+
     def _add_action(self, name, cb):
         action = Gio.SimpleAction.new(name, None)
         action.connect("activate", lambda *_: cb())

@@ -61,10 +61,17 @@ class OverviewPage(Gtk.Box):
                            self.app.run_backup(backup_key))
             box.append(action)
 
+            verify = Gtk.Button(label="Verify replica")
+            verify.set_halign(Gtk.Align.START)
+            verify.connect("clicked", lambda _button, backup_key=key:
+                           self.app.verify_replica(backup_key))
+            box.append(verify)
+
             card.set_child(box)
             self.append(card)
             self.cards[key] = {"bar": bar, "lbl": lbl, "det": det,
-                               "speed": speed, "action": action}
+                               "speed": speed, "action": action,
+                               "verify": verify}
 
         self.info_lbl = Gtk.Label(label="loading…", xalign=0)
         self.info_lbl.add_css_class("dim-label")
@@ -91,8 +98,12 @@ class OverviewPage(Gtk.Box):
             card = self.cards[key]
             card["action"].set_sensitive(
                 bool(self.cfg.get("setup_complete")) and not running)
+            image_monthly = (key == "monthly" and
+                             self.cfg.get("monthly_mode") == "system_image")
             card["action"].set_label(
-                "Continue interrupted backup" if incomplete else "Back up now")
+                "Continue interrupted backup" if incomplete else
+                ("Image system now" if image_monthly else "Back up now"))
+            card["verify"].set_sensitive(not image_monthly)
             if (not self.cfg.get("schedule_enabled", {}).get(key, True)
                     and not running and not incomplete):
                 card["lbl"].set_label("automatic schedule disabled")
@@ -176,7 +187,7 @@ class OverviewPage(Gtk.Box):
 
         if st is None:
             card["bar"].set_fraction(0.0)
-            card["lbl"].set_label("running…" if running else "waiting for next run")
+            card["lbl"].set_label("starting…" if running else "waiting for next run")
             card["speed"].set_label("")
             card["det"].set_label("")
         elif st.get("summary"):
@@ -190,11 +201,13 @@ class OverviewPage(Gtk.Box):
             card["bar"].set_fraction(pct / 100.0)
             card["lbl"].set_label(f"{pct:.2f}%")
             remaining = max(0, st.get("total_bytes", 0) - cur_b)
-            if rate > 0:
+            if cur_b <= 0:
+                card["speed"].set_label("starting…" if running else "")
+            elif rate > 0:
                 card["speed"].set_label(
                     f"{rate / 1e6:.1f} MB/s  ·  ETA {B.fmt_eta(remaining / rate)}")
             else:
-                card["speed"].set_label("starting…")
+                card["speed"].set_label("—")
             card["det"].set_label(
                 f"{st.get('files_done', 0):,}/{st.get('total_files', 0):,} files  ·  "
                 f"{B.fmt_bytes(cur_b)} / {B.fmt_bytes(st.get('total_bytes', 0))}")

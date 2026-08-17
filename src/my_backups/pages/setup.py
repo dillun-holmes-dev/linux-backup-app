@@ -298,14 +298,19 @@ class SetupPage(Gtk.Box):
         self.json_entry.set_hexpand(True)
         json_choose = Gtk.Button(label="Choose JSON…")
         json_choose.connect("clicked", lambda *_: self._choose_json())
+        json_find = Gtk.Button(label="Find file…")
+        json_find.connect("clicked", lambda *_: self._find_json())
         json_row.append(self.json_entry)
         json_row.append(json_choose)
+        json_row.append(json_find)
         self.json_box.append(json_row)
         help_label = Gtk.Label(xalign=0, wrap=True)
         help_label.set_markup(
-            "Create a Desktop OAuth client, add your Google account as a test user, "
-            "then download its JSON. <a href=\"https://rclone.org/drive/"
-            "#making-your-own-client-id\">Open step-by-step instructions</a>.")
+            "Create a Desktop OAuth client, add your Google account as a test "
+            "user, then download its JSON — it is saved as <b>client_secret_…"
+            "json</b>, usually in your <b>Downloads</b> folder. "
+            "<a href=\"https://rclone.org/drive/#making-your-own-client-id\">"
+            "Open step-by-step instructions</a>.")
         help_label.add_css_class("dim-label")
         self.json_box.append(help_label)
         cloud.append(self.json_box)
@@ -432,6 +437,23 @@ class SetupPage(Gtk.Box):
         excludes_btn.connect("clicked", self._open_exclusions)
         excludes_box.append(excludes_btn)
         page.append(excludes_frame)
+
+        image_frame, image_box = self._frame("Monthly backup type")
+        self.monthly_image = Gtk.CheckButton(
+            label="Bootable system image - whole OS with all files and apps")
+        self.monthly_image.set_active(
+            self.cfg.get("monthly_mode") == "system_image")
+        image_box.append(self.monthly_image)
+        self.system_disk = Gtk.Entry()
+        self.system_disk.set_text(self.cfg.get("system_disk") or "")
+        self.system_disk.set_placeholder_text("Auto-detect (e.g. /dev/nvme0n1)")
+        image_box.append(self._row("System disk (optional)", self.system_disk))
+        image_box.append(Gtk.Label(
+            label="When enabled, the monthly backup is a complete bootable copy "
+                  "of the operating system. Restore by copying it onto any drive "
+                  "and booting from it. Requires your admin password each run.",
+            xalign=0, wrap=True))
+        page.append(image_frame)
         self.wizard.add_named(wrapper, "step-2")
 
     # ------------------------------------------------------------- page four
@@ -558,7 +580,10 @@ class SetupPage(Gtk.Box):
         if self.monthly_enabled.get_active():
             month = self.monthly_day.get_selected()
             day = "last day" if month == 28 else f"day {month + 1}"
-            jobs.append(f"Monthly on {day} at {self.monthly_time.get_text()}")
+            if self.monthly_image.get_active():
+                jobs.append("Monthly: bootable system image of the whole OS")
+            else:
+                jobs.append(f"Monthly on {day} at {self.monthly_time.get_text()}")
         if self.integrity_enabled.get_active():
             jobs.append(f"Integrity check on {self.DAYS[self.integrity_day.get_selected()]} "
                         f"at {self.integrity_time.get_text()}")
@@ -662,6 +687,14 @@ class SetupPage(Gtk.Box):
             title="Choose Google Desktop OAuth JSON", transient_for=self.app.window,
             action=Gtk.FileChooserAction.OPEN,
             accept_label="Use this JSON", cancel_label="Cancel")
+        current = self.json_entry.get_text().strip()
+        if current and Path(current).expanduser().is_file():
+            dialog.set_current_folder(str(Path(current).expanduser().parent))
+        else:
+            for folder in (Path.home() / "Downloads", Path.home()):
+                if folder.is_dir():
+                    dialog.set_current_folder(str(folder))
+                    break
         file_filter = Gtk.FileFilter()
         file_filter.set_name("JSON files")
         file_filter.add_pattern("*.json")
@@ -675,6 +708,42 @@ class SetupPage(Gtk.Box):
             path = selected.get_path() if selected else None
             if path:
                 self.json_entry.set_text(path)
+        dialog.destroy()
+
+    def _find_json(self):
+        paths = B.find_oauth_client_files()
+        if not paths:
+            self.app.window.toast(
+                "No Google OAuth JSON found. Check Downloads/Desktop, or use "
+                "Choose JSON… to browse.", "error")
+            return
+        if len(paths) == 1:
+            self.json_entry.set_text(paths[0])
+            self.app.window.toast("Found " + Path(paths[0]).name, "info")
+            return
+        dialog = Gtk.Dialog(title="Choose an OAuth JSON file",
+                            transient_for=self.app.window, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Use this file", Gtk.ResponseType.ACCEPT)
+        area = dialog.get_content_area()
+        area.set_spacing(8)
+        area.set_margin_top(12)
+        area.set_margin_bottom(12)
+        area.set_margin_start(12)
+        area.set_margin_end(12)
+        area.append(Gtk.Label(label="Found more than one client JSON:", xalign=0))
+        model = Gtk.StringList.new([Path(p).name for p in paths])
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(0)
+        area.append(dropdown)
+        dialog.connect("response", self._find_json_response, dropdown, paths)
+        dialog.present()
+
+    def _find_json_response(self, dialog, response, dropdown, paths):
+        if response == Gtk.ResponseType.ACCEPT:
+            index = dropdown.get_selected()
+            if 0 <= index < len(paths):
+                self.json_entry.set_text(paths[index])
         dialog.destroy()
 
     def _test_smb(self, _button):
@@ -761,6 +830,8 @@ class SetupPage(Gtk.Box):
             self.DAYS[self.integrity_day.get_selected()], self.integrity_time.get_text(),
             self.daily_enabled.get_active(), self.weekly_enabled.get_active(),
             self.monthly_enabled.get_active(), self.integrity_enabled.get_active(),
+            ("system_image" if self.monthly_image.get_active() else "restic"),
+            self.system_disk.get_text().strip(),
             {"remote": self.cfg.get("smb_remote", "vaultleaf-smb"),
              "host": self.smb_host.get_text().strip(),
              "share": self.smb_share.get_text().strip(),
