@@ -208,6 +208,7 @@ class BackupApplication(Gtk.Application):
             GLib.timeout_add_seconds(30, self.tray.retry_registration)
             threading.Thread(target=self._start_portable_services, daemon=True).start()
             threading.Thread(target=self._check_available_update, daemon=True).start()
+            threading.Thread(target=self._self_heal, daemon=True).start()
             if not self._background_start:
                 self.window.present()
             GLib.timeout_add(1000, self._tick)
@@ -226,6 +227,15 @@ class BackupApplication(Gtk.Application):
         B.ensure_portable_mount(self.cfg)
         B.run_portable_schedule(self.cfg)
         self._resume_interrupted_backups()
+
+    def _self_heal(self):
+        try:
+            repaired = B.self_heal(self.cfg)
+        except Exception:
+            return
+        if repaired and self.window is not None:
+            GLib.idle_add(self.window.toast,
+                          "VaultLeaf repaired automatically: " + "; ".join(repaired))
 
     def _existing_setup_notice(self):
         text = ("Your existing backup plan was found and is ready. "

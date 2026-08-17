@@ -997,24 +997,28 @@ def _tool_version(path):
 
 
 def _install_bundled_tools():
-    """Keep CLI tools available to timers after the AppImage is unmounted.
+    """Ensure the newest restic/rclone is available to timers; self-heal.
 
-    Install the newest available version of each tool so a stale bundled
-    binary (e.g. an old restic that cannot read current repository formats)
-    never shadows a newer system copy, and vice versa.
+    Installs the newest version of each tool found among the existing tool
+    directory, the AppImage bundle (when present), and the system PATH, so a
+    stale bundled binary (e.g. an old restic that cannot read current
+    repository formats) can never shadow a newer system copy, and vice versa.
+    Returns the tool directory, or None when no tool was found anywhere.
     """
     bundled = os.environ.get("VAULTLEAF_BUNDLED_BIN")
-    if not bundled:
-        return None
-    source_dir = Path(bundled)
+    source_dir = Path(bundled) if bundled else None
     tool_dir = DATA_DIR / "bin"
     tool_dir.mkdir(parents=True, exist_ok=True)
     copied = False
     for name in ("restic", "rclone"):
+        installed = tool_dir / name
         candidates = []
-        bundled_candidate = source_dir / name
-        if bundled_candidate.is_file():
-            candidates.append((_tool_version(bundled_candidate), bundled_candidate))
+        if installed.is_file():
+            candidates.append((_tool_version(installed), installed))
+        if source_dir is not None:
+            bundled_candidate = source_dir / name
+            if bundled_candidate.is_file():
+                candidates.append((_tool_version(bundled_candidate), bundled_candidate))
         for directory in ("/usr/local/bin", "/usr/bin", "/bin"):
             system_candidate = Path(directory) / name
             if system_candidate.is_file():
@@ -1022,7 +1026,6 @@ def _install_bundled_tools():
         if not candidates:
             continue
         best_version, best_path = max(candidates, key=lambda item: item[0])
-        installed = tool_dir / name
         if installed.is_file() and _tool_version(installed) == best_version:
             continue
         temporary = installed.with_name(f".{installed.name}.{os.getpid()}.tmp")
@@ -1033,7 +1036,50 @@ def _install_bundled_tools():
         finally:
             temporary.unlink(missing_ok=True)
         copied = True
-    return tool_dir if copied else None
+    if (tool_dir / "restic").is_file() or (tool_dir / "rclone").is_file():
+        return tool_dir
+    return None
+
+
+def self_heal(cfg):
+    """Idempotent startup repair so the app recovers from broken state.
+
+    Reinstalls the newest restic/rclone, regenerates the backup and integrity
+    runner scripts, and recreates missing systemd user timers. Returns a short
+    list of what was repaired (empty when nothing needed fixing).
+    """
+    repaired = []
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "logs").mkdir(parents=True, exist_ok=True)
+    (DATA_DIR / "state").mkdir(parents=True, exist_ok=True)
+
+    tool_dir = _install_bundled_tools()
+
+    runner = DATA_DIR / "run-backup.sh"
+    integrity_runner = DATA_DIR / "run-integrity.sh"
+    missing_scripts = not runner.is_file() or not integrity_runner.is_file()
+
+    missing_units = []
+    if cfg.get("scheduler_backend") == "systemd" and user_systemd_available():
+        missing_units = [key for key in ("daily", "weekly", "monthly", "integrity")
+                         if not (USER_UNIT_DIR / f"my-backups-{key}.timer").is_file()]
+
+    if missing_scripts or missing_units:
+        sched = cfg.get("schedule", {})
+        try:
+            _install_user_units(
+                cfg,
+                sched.get("daily_time", "21:00"),
+                sched.get("weekly_day", "Sun"),
+                sched.get("weekly_time", "20:00"),
+                mount_remote=cfg.get("mount_source") or None)
+            repaired.append("backup scripts/timers")
+        except Exception:  # noqa: BLE001 - Setup can retry interactively
+            pass
+
+    if not (tool_dir and (tool_dir / "restic").is_file()) and not shutil.which("restic"):
+        repaired.append("restic missing - run Setup to install it")
+    return repaired
 
 
 def launch_application(path):
