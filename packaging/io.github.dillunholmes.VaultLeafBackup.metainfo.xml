@@ -20,6 +20,11 @@
     <category>Archiving</category>
   </categories>
   <releases>
+    <release version="1.3.0" date="2026-08-17">
+      <description>
+        <p>Automatically adopts existing setup and resumes interrupted backups after login until complete.</p>
+      </description>
+    </release>
     <release version="1.2.1" date="2026-08-17">
       <description>
         <p>Streamlines first-run AppImage handoff and recovery state for upgraded installations.</p>

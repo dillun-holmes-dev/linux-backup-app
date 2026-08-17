@@ -1,6 +1,7 @@
 """Interrupted backup state is surfaced without mistaking active work."""
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -51,6 +52,17 @@ class BackupStateTest(unittest.TestCase):
             output.write_text(json.dumps({"message_type": "summary"}) + "\n")
             with patch.object(backend, "service_running", return_value=False):
                 self.assertFalse(backend.backup_incomplete(self.config(output), "daily"))
+
+    def test_migrated_runner_tracks_interruption_and_has_valid_shell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = Path(directory) / "data"
+            cfg = backend.load_config(Path(directory) / "missing.json")
+            with patch.object(backend, "DATA_DIR", data):
+                runner = backend._write_backup_runner(cfg)
+            result = subprocess.run(
+                ["/bin/sh", "-n", str(runner)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('run_state="$output.run"', runner.read_text())
 
 
 if __name__ == "__main__":
