@@ -1,5 +1,5 @@
 #!/bin/sh
-# AppImage entry point.  Uses the host's python3 + GTK (PyGObject/GTK4).
+# AppImage entry point. Everything below $APPDIR/usr is bundled.
 # Resolve the real AppRun path whether run from the AppImage or an AppDir.
 SELF="$0"
 while [ -h "$SELF" ]; do
@@ -10,5 +10,27 @@ while [ -h "$SELF" ]; do
     esac
 done
 APPDIR="$(cd "$(dirname "$SELF")" && pwd)"
-export PYTHONPATH="$APPDIR/usr/lib/my-backups${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m my_backups "$@"
+export PATH="$APPDIR/usr/bin:$PATH"
+export VAULTLEAF_SYSTEM_LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PYTHONHOME="$APPDIR/usr"
+export PYTHONPATH="$APPDIR/usr/lib/my-backups:$APPDIR/usr/lib/python3/dist-packages"
+export GI_TYPELIB_PATH="$APPDIR/usr/lib/girepository-1.0"
+export GIO_EXTRA_MODULES="$APPDIR/usr/lib/gio/modules"
+export VAULTLEAF_SYSTEM_XDG_DATA_DIRS="${XDG_DATA_DIRS-}"
+export XDG_DATA_DIRS="$APPDIR/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+export VAULTLEAF_BUNDLED_BIN="$APPDIR/usr/bin"
+export GTK_PATH="$APPDIR/usr/lib/gtk-4.0"
+# Do not mix a newer host's GTK input plugin with the bundled GLib runtime.
+export GTK_IM_MODULE="${VAULTLEAF_GTK_IM_MODULE:-gtk-im-context-simple}"
+
+for loader_dir in "$APPDIR"/usr/lib/gdk-pixbuf-2.0/*/loaders; do
+    [ -d "$loader_dir" ] || continue
+    export GDK_PIXBUF_MODULEDIR="$loader_dir"
+    loader_cache="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/vaultleaf-gdk-pixbuf-$$.cache"
+    "$APPDIR/usr/bin/gdk-pixbuf-query-loaders" >"$loader_cache" 2>/dev/null || true
+    [ -s "$loader_cache" ] && export GDK_PIXBUF_MODULE_FILE="$loader_cache"
+    break
+done
+
+exec "$APPDIR/usr/bin/python3" -m my_backups "$@"

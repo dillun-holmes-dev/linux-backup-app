@@ -35,11 +35,13 @@ fi
 INSTALL_DIR="$HOME/.local/lib/my-backups"
 BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
-mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$APP_DIR"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+APP_ID="io.github.dillunholmes.VaultLeafBackup"
+mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
 if [ -e "$INSTALL_DIR/my_backups" ]; then
     mv "$INSTALL_DIR/my_backups" "$INSTALL_DIR/my_backups.previous.$$"
 fi
-cp -R "$ROOT/my_backups" "$INSTALL_DIR/my_backups"
+cp -R "$ROOT/src/my_backups" "$INSTALL_DIR/my_backups"
 
 cat >"$BIN_DIR/my-backups" <<EOF
 #!/bin/sh
@@ -47,14 +49,19 @@ export PYTHONPATH="$INSTALL_DIR"
 exec python3 -m my_backups "\$@"
 EOF
 chmod 755 "$BIN_DIR/my-backups"
+cp "$ROOT/uninstall.sh" "$BIN_DIR/vaultleaf-uninstall"
+chmod 755 "$BIN_DIR/vaultleaf-uninstall"
 
-cat >"$APP_DIR/my-backups.desktop" <<EOF
+cp "$ROOT/src/my_backups/data/icon.svg" "$ICON_DIR/$APP_ID.svg"
+
+cat >"$APP_DIR/$APP_ID.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=VaultLeaf Backup
 Comment=Automatic restic and rclone backups
 Exec=$BIN_DIR/my-backups
-Icon=drive-harddisk
+Icon=$APP_ID
+StartupWMClass=$APP_ID
 Categories=Utility;Archiving;FileTools;
 EOF
 

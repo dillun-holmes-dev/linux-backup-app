@@ -1,0 +1,65 @@
+name: Build Linux releases
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x86_64
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-gi gir1.2-gtk-4.0 \
+            libgdk-pixbuf2.0-bin ibus-gtk4 restic rclone curl file
+      - name: Verify version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          source_version="$(sed -n 's/^VERSION = "\([^"]*\)"/\1/p' src/my_backups/metadata.py)"
+          test "v$source_version" = "${GITHUB_REF_NAME}"
+      - name: Run tests
+        run: PYTHONPATH=src python3 -m unittest discover -s tests -v
+      - name: Build native release
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: ./packaging/build-release.sh
+      - name: Test embedded runtime
+        run: |
+          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --version
+          ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --self-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VaultLeafBackup-${{ matrix.arch }}
+          path: dist/*${{ matrix.arch }}*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag

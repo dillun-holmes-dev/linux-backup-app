@@ -1,0 +1,4 @@
+#!/bin/sh
+# Portable AppDir launcher. AppImage launches enter through AppRun directly.
+APPDIR="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
+exec "$APPDIR/AppRun" "$@"

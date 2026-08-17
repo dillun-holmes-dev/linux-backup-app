@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vaultleaf-backup"
+version = "1.1.0"
+description = "Friendly encrypted backup manager for Linux"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "dillun-holmes-dev"}]
+keywords = ["backup", "restic", "rclone", "gtk", "linux"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: X11 Applications :: GTK",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+]
+
+[project.scripts]
+vaultleaf-backup = "my_backups.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["my_backups", "my_backups.pages"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+my_backups = ["data/*.svg"]

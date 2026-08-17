@@ -62,10 +62,10 @@ the PR description are always welcome.
 
 ## Development setup
 
-This is a GTK4 Python app (`my_backups/`). Running from source:
+This is a GTK4 Python app (`src/my_backups/`). Running from source:
 
 ```sh
-python3 -m my_backups
+PYTHONPATH=src python3 -m my_backups
 ```
 
 It shells out to **restic** and **rclone**, which must be installed and
@@ -74,8 +74,8 @@ reachable. See the README for the AppImage build (packaging/).
 ## Code style
 
 - Python 3.10+, PEP 8, type hints on new public functions.
-- Keep GTK UI code in `my_backups/pages/`; keep shelling/backup logic in
-  `my_backups/backend.py`.
+- Keep GTK UI code in `src/my_backups/pages/`; keep shelling/backup logic in
+  `src/my_backups/backend.py`.
 - Prefer small, readable functions over clever one-liners.
 
 ## Reporting issues
