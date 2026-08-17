@@ -52,7 +52,7 @@ class BackupWindow(Gtk.ApplicationWindow):
     # ------------------------------------------------------------------ UI
     def _build(self):
         hb = Gtk.HeaderBar()
-        brand = Gtk.Image.new_from_file(str(Path(__file__).parent / "data" / "icon.svg"))
+        brand = Gtk.Image.new_from_file(str(Path(__file__).parent / "data" / "icon.png"))
         brand.set_pixel_size(28)
         hb.pack_start(brand)
         hb.set_title_widget(Gtk.Label(label="VaultLeaf Backup"))
@@ -165,6 +165,11 @@ class BackupApplication(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        try:
+            B.ensure_desktop_identity()
+        except OSError:
+            # A restricted home must not prevent the application opening.
+            pass
         self.hold()
         self._held = True
         self.cache.start()

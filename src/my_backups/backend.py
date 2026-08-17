@@ -831,6 +831,50 @@ def _calendar_monthly(day, clock):
     return f"{date} {clock}:00"
 
 
+def ensure_desktop_identity(desktop_exec=None):
+    """Install the canonical desktop ID and leaf icon for docks/taskbars."""
+    if desktop_exec is None:
+        appimage = os.environ.get("APPIMAGE")
+        if appimage:
+            executable = str(Path(appimage).resolve())
+            desktop_exec = ('"' + executable.replace("\\", "\\\\")
+                            .replace('"', '\\"') + '"')
+        else:
+            launcher = DATA_DIR / "start-app.sh"
+            if not launcher.is_file():
+                return False
+            desktop_exec = ('"' + str(launcher).replace("\\", "\\\\")
+                            .replace('"', '\\"') + '"')
+
+    icon_dir = (Path.home() / ".local" / "share" / "icons" / "hicolor" /
+                "256x256" / "apps")
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    icon_target = icon_dir / f"{APP_ICON}.png"
+    shutil.copy2(Path(__file__).parent / "data" / "icon.png", icon_target)
+
+    menu_entry = (Path.home() / ".local" / "share" / "applications" /
+                  f"{APP_ID}.desktop")
+    menu_entry.parent.mkdir(parents=True, exist_ok=True)
+    menu_entry.write_text(
+        f"[Desktop Entry]\nType=Application\nVersion=1.0\nName={APP_NAME}\n"
+        "GenericName=Backup manager\n"
+        "Comment=Friendly encrypted backups and safe file recovery\n"
+        f"Exec={desktop_exec}\nIcon={icon_target}\n"
+        f"StartupWMClass={APP_ID}\n"
+        "Terminal=false\nCategories=Utility;Archiving;FileTools;\n"
+        "StartupNotify=true\n")
+    os.chmod(menu_entry, 0o644)
+
+    for command, target in (("update-desktop-database", menu_entry.parent),
+                            ("gtk-update-icon-cache", icon_dir.parents[1])):
+        if shutil.which(command):
+            try:
+                _run_process([command, str(target)], capture_output=True, timeout=20)
+            except Exception:
+                pass
+    return True
+
+
 def _install_autostart():
     """Start the tray/background controller after desktop login."""
     launcher = DATA_DIR / "start-app.sh"
@@ -863,19 +907,7 @@ def _install_autostart():
         f"Exec={desktop_exec} --background\nIcon={APP_ICON}\n"
         f"StartupWMClass={APP_ID}\n"
         "X-GNOME-Autostart-enabled=true\nNoDisplay=true\n")
-    menu_entry = (Path.home() / ".local" / "share" / "applications" /
-                  f"{APP_ID}.desktop")
-    menu_entry.parent.mkdir(parents=True, exist_ok=True)
-    menu_entry.write_text(
-        f"[Desktop Entry]\nType=Application\nName={APP_NAME}\n"
-        "Comment=Automatic restic and rclone backups\n"
-        f"Exec={desktop_exec}\nIcon={APP_ICON}\nStartupWMClass={APP_ID}\n"
-        "Categories=Utility;System;\n")
-    icon_dir = (Path.home() / ".local" / "share" / "icons" / "hicolor" /
-                "scalable" / "apps")
-    icon_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(Path(__file__).parent / "data" / "icon.svg",
-                 icon_dir / f"{APP_ICON}.svg")
+    ensure_desktop_identity(desktop_exec)
     bundled_bin = os.environ.get("VAULTLEAF_BUNDLED_BIN")
     if bundled_bin:
         uninstaller = Path(bundled_bin) / "vaultleaf-uninstall"
@@ -936,6 +968,8 @@ def uninstall_application():
         home / ".local" / "share" / "applications" / "my-backups.desktop",
         home / ".local" / "share" / "icons" / "hicolor" / "scalable" /
         "apps" / f"{APP_ICON}.svg",
+        home / ".local" / "share" / "icons" / "hicolor" / "256x256" /
+        "apps" / f"{APP_ICON}.png",
         home / ".local" / "bin" / "my-backups",
         home / ".local" / "bin" / "vaultleaf-backup",
         home / ".local" / "bin" / "vaultleaf-uninstall",

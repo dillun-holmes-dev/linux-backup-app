@@ -30,11 +30,14 @@ if __name__ == "__main__":
         sys.exit(0)
     if "--ui-test" in sys.argv:
         from .app import BackupApplication, BackupWindow, _set_linux_identity
+        from .tray import load_icon_pixmaps
         _set_linux_identity()
         application = BackupApplication()
         if not application.register():
             raise RuntimeError("Could not register the GTK application")
         window = BackupWindow(application)
+        if not load_icon_pixmaps():
+            raise RuntimeError("Could not render the tray icon")
         window.destroy()
         application.cache.stop()
         print("VaultLeaf GTK interface: OK")

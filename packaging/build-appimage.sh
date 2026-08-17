@@ -53,7 +53,8 @@ rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib/my-backups" \
     "$APPDIR/usr/lib/python3/dist-packages" "$APPDIR/usr/lib/girepository-1.0" \
     "$APPDIR/usr/share/applications" "$APPDIR/usr/share/metainfo" \
-    "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+    "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
+    "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
 cp -a "$ROOT/src/my_backups" "$APPDIR/usr/lib/my-backups/"
 cp -aL "$PYTHON" "$APPDIR/usr/bin/python3"
@@ -136,8 +137,11 @@ cp "$HERE/$APP_ID.metainfo.xml" \
     "$APPDIR/usr/share/metainfo/$APP_ID.appdata.xml"
 cp "$ROOT/src/my_backups/data/icon.svg" \
     "$APPDIR/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+cp "$ROOT/src/my_backups/data/icon.png" \
+    "$APPDIR/usr/share/icons/hicolor/256x256/apps/$APP_ID.png"
 cp "$ROOT/src/my_backups/data/icon.svg" "$APPDIR/$APP_ID.svg"
-cp "$ROOT/src/my_backups/data/icon.svg" "$APPDIR/.DirIcon"
+cp "$ROOT/src/my_backups/data/icon.png" "$APPDIR/$APP_ID.png"
+cp "$ROOT/src/my_backups/data/icon.png" "$APPDIR/.DirIcon"
 
 TOOL="$HERE/appimagetool-$ARCH.AppImage"
 if [ ! -f "$TOOL" ]; then
