@@ -185,6 +185,29 @@ def last_status(path):
     return None
 
 
+def backup_incomplete(cfg, key, running=None):
+    """Return whether the last backup stopped before producing a snapshot."""
+    svc = cfg.get("services", {}).get(key, "")
+    if running is None:
+        running = bool(svc and service_running(svc, cfg))
+    if running:
+        return False
+    output = cfg.get(key + "_json")
+    if not output:
+        return False
+    state_path = Path(str(output) + ".run")
+    try:
+        state = json.loads(state_path.read_text()).get("state")
+        if state == "complete":
+            return False
+        if state in ("running", "interrupted", "failed"):
+            return True
+    except (OSError, ValueError, TypeError):
+        pass
+    status = last_status(output)
+    return bool(status and not status.get("summary"))
+
+
 def service_running(svc, cfg=None):
     try:
         if cfg and cfg.get("scheduler_backend") == "internal":
@@ -880,13 +903,9 @@ def _install_autostart():
     launcher = DATA_DIR / "start-app.sh"
     appimage = os.environ.get("APPIMAGE")
     if appimage:
-        installed_dir = Path.home() / ".local" / "lib" / "my-backups"
-        installed_dir.mkdir(parents=True, exist_ok=True)
-        installed_app = installed_dir / "MyBackups.AppImage"
-        source_app = Path(appimage).resolve()
-        if source_app != installed_app.resolve():
-            shutil.copy2(source_app, installed_app)
-        os.chmod(installed_app, 0o755)
+        # Normal AppImage startup has already promoted itself to this stable
+        # path. Do not create a second installed copy during setup.
+        installed_app = Path(appimage).resolve()
         command = f"exec {shlex.quote(str(installed_app))} \"$@\"\n"
     else:
         installed_python = DATA_DIR / "app"
@@ -977,6 +996,7 @@ def uninstall_application():
     for path in paths:
         path.unlink(missing_ok=True)
     shutil.rmtree(home / ".local" / "lib" / "my-backups", ignore_errors=True)
+    shutil.rmtree(home / ".local" / "lib" / "vaultleaf-backup", ignore_errors=True)
     shutil.rmtree(DATA_DIR / "bin", ignore_errors=True)
     for name in ("run-backup.sh", "run-integrity.sh", "start-app.sh",
                  "install-dependencies.sh"):
@@ -1010,6 +1030,24 @@ export RCLONE_DRIVE_CHUNK_SIZE={SPEED_PROFILES[cfg.get("speed_profile", "balance
 export RCLONE_RETRIES=10
 export RCLONE_LOW_LEVEL_RETRIES=20
 mkdir -p "$(dirname "$output")" "$(dirname "$log")"
+run_state="$output.run"
+started_at="$(date +%Y-%m-%dT%H:%M:%S%z)"
+state_tmp="$run_state.tmp.$$"
+printf '{{"key":"%s","state":"running","started_at":"%s"}}\n' \
+  "$kind" "$started_at" >"$state_tmp"
+mv "$state_tmp" "$run_state"
+finish_run() {{
+  code="$1"
+  trap - 0
+  finished_at="$(date +%Y-%m-%dT%H:%M:%S%z)"
+  if [ "$code" -eq 0 ]; then run_result="complete"; else run_result="interrupted"; fi
+  state_tmp="$run_state.tmp.$$"
+  printf '{{"key":"%s","state":"%s","started_at":"%s","finished_at":"%s","exit_code":%s}}\n' \
+    "$kind" "$run_result" "$started_at" "$finished_at" "$code" >"$state_tmp"
+  mv "$state_tmp" "$run_state"
+  exit "$code"
+}}
+trap 'finish_run $?' 0
 if [ -f "$log" ] && [ "$(wc -c <"$log")" -gt 10485760 ]; then
   mv "$log" "$log.previous"
 fi
@@ -1356,9 +1394,15 @@ def start_backup(cfg, key, on_done=None):
     """Start a backup service via pkexec/sudo in a background thread."""
     svc = cfg["services"].get(key)
     if not svc:
+        if on_done:
+            on_done(False, f"Unknown backup type: {key}")
         return
 
     def _run():
+        if service_running(svc, cfg):
+            if on_done:
+                on_done(False, f"The {key} backup is already running")
+            return
         if cfg.get("scheduler_backend") == "internal":
             try:
                 _popen_process([str(DATA_DIR / "run-backup.sh"), key],

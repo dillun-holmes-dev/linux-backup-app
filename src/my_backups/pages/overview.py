@@ -54,9 +54,17 @@ class OverviewPage(Gtk.Box):
             det.add_css_class("dim-label")
             box.append(det)
 
+            action = Gtk.Button(label="Back up now")
+            action.set_halign(Gtk.Align.START)
+            action.add_css_class("suggested-action")
+            action.connect("clicked", lambda _button, backup_key=key:
+                           self.app.run_backup(backup_key))
+            box.append(action)
+
             card.set_child(box)
             self.append(card)
-            self.cards[key] = {"bar": bar, "lbl": lbl, "det": det, "speed": speed}
+            self.cards[key] = {"bar": bar, "lbl": lbl, "det": det,
+                               "speed": speed, "action": action}
 
         self.info_lbl = Gtk.Label(label="loading…", xalign=0)
         self.info_lbl.add_css_class("dim-label")
@@ -74,18 +82,21 @@ class OverviewPage(Gtk.Box):
         now = time.time()
         runs = []
         for key, svc in self.cfg["services"].items():
-            if not self.cfg.get("schedule_enabled", {}).get(key, True):
-                card = self.cards.get(key)
-                if card:
-                    card["bar"].set_fraction(0.0)
-                    card["lbl"].set_label("automatic schedule disabled")
-                    card["speed"].set_label("")
-                    card["det"].set_label("you can still run it manually")
-                continue
             jpath = self.cfg[key + "_json"]
             running = B.service_running(svc, self.cfg)
             st = B.last_status(jpath)
+            incomplete = B.backup_incomplete(self.cfg, key, running=running)
             self._update_card(key, st, running, now)
+            card = self.cards[key]
+            card["action"].set_sensitive(
+                bool(self.cfg.get("setup_complete")) and not running)
+            card["action"].set_label(
+                "Continue interrupted backup" if incomplete else "Back up now")
+            if (not self.cfg.get("schedule_enabled", {}).get(key, True)
+                    and not running and not incomplete):
+                card["lbl"].set_label("automatic schedule disabled")
+                card["speed"].set_label("")
+                card["det"].set_label("Manual backups are still available")
             if running:
                 runs.append(key)
         if runs:

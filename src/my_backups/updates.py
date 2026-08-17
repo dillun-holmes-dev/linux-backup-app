@@ -138,13 +138,7 @@ def install_release(release):
         if actual != expected:
             raise RuntimeError("Update download failed its SHA-256 verification")
         os.chmod(temporary, 0o755)
-        backup = target.with_name(target.name + ".previous")
-        if backup.exists():
-            backup.unlink()
-        os.replace(target, backup)
-        try:
-            os.replace(temporary, target)
-        except Exception:
-            os.replace(backup, target)
-            raise
+        # os.replace is atomic on the same filesystem. Keep exactly one
+        # installed AppImage instead of accumulating recovery copies.
+        os.replace(temporary, target)
     return target

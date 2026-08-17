@@ -16,12 +16,14 @@ class UninstallTest(unittest.TestCase):
             data = home / ".local" / "share" / "my-backups"
             units = home / ".config" / "systemd" / "user"
             install = home / ".local" / "lib" / "my-backups"
+            stable_install = home / ".local" / "lib" / "vaultleaf-backup"
             menu = home / ".local" / "share" / "applications" / f"{APP_ID}.desktop"
-            for path in (data, units, install, menu.parent):
+            for path in (data, units, install, stable_install, menu.parent):
                 path.mkdir(parents=True, exist_ok=True)
             (data / "restic-passphrase.txt").write_text("secret")
             (data / "run-backup.sh").write_text("generated")
             (install / "MyBackups.AppImage").write_text("app")
+            (stable_install / "VaultLeafBackup.AppImage").write_text("app")
             menu.write_text("desktop")
             config = home / ".config" / "my-backups" / "config.json"
             config.parent.mkdir(parents=True)
@@ -34,6 +36,7 @@ class UninstallTest(unittest.TestCase):
                 backend.uninstall_application()
 
             self.assertFalse(install.exists())
+            self.assertFalse(stable_install.exists())
             self.assertFalse(menu.exists())
             self.assertFalse((data / "run-backup.sh").exists())
             self.assertTrue((data / "restic-passphrase.txt").exists())
