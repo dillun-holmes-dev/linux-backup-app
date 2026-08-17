@@ -51,6 +51,19 @@ class BootstrapTest(unittest.TestCase):
             self.assertTrue(unrelated.exists())
             self.assertTrue(archive.exists())
 
+    def test_handoff_continues_current_runtime_using_stable_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "download.AppImage"
+            target = root / "installed.AppImage"
+            source.write_bytes(b"new")
+            with patch.dict(bootstrap.os.environ, {"APPIMAGE": str(source)}), \
+                 patch.object(bootstrap, "promote_appimage", return_value=(target, True)), \
+                 patch.object(bootstrap, "_quit_existing_instance"), \
+                 patch.object(bootstrap, "remove_downloaded_copies"):
+                self.assertFalse(bootstrap.handoff_to_installed_appimage())
+                self.assertEqual(bootstrap.os.environ["APPIMAGE"], str(target))
+
 
 if __name__ == "__main__":
     unittest.main()
