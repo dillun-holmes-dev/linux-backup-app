@@ -20,6 +20,21 @@
     <category>Archiving</category>
   </categories>
   <releases>
+    <release version="1.4.2" date="2026-08-17">
+      <description>
+        <p>Adds full shutdown/resume of backup services from the tray and menu, and fixes a Setup page crash on already-configured systems.</p>
+      </description>
+    </release>
+    <release version="1.4.1" date="2026-08-17">
+      <description>
+        <p>Shows an "already set up" state in Setup and adds one-time permanent admin permission for bootable monthly image backups.</p>
+      </description>
+    </release>
+    <release version="1.4.0" date="2026-08-17">
+      <description>
+        <p>Adds self-healing startup, installs the newest restic/rclone, replica verification, and bootable monthly system images.</p>
+      </description>
+    </release>
     <release version="1.3.0" date="2026-08-17">
       <description>
         <p>Automatically adopts existing setup and resumes interrupted backups after login until complete.</p>
