@@ -9,7 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
-from gi.repository import Gio, GLib, Gtk
+from gi.repository import Gdk, Gio, GLib, Gtk
 
 from . import backend as B
 from . import updates
@@ -34,6 +34,16 @@ def _set_linux_identity():
         pass
 
 
+def _leaf_image():
+    """Build the leaf logo without depending on host image-loader plugins."""
+    pixels = (Path(__file__).parent / "data" / "icon-64.rgba").read_bytes()
+    if len(pixels) != 64 * 64 * 4:
+        raise RuntimeError("The bundled leaf icon pixels are invalid")
+    texture = Gdk.MemoryTexture.new(
+        64, 64, Gdk.MemoryFormat.R8G8B8A8, GLib.Bytes.new(pixels), 64 * 4)
+    return Gtk.Image.new_from_paintable(texture)
+
+
 class BackupWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="VaultLeaf Backup")
@@ -52,7 +62,7 @@ class BackupWindow(Gtk.ApplicationWindow):
     # ------------------------------------------------------------------ UI
     def _build(self):
         hb = Gtk.HeaderBar()
-        brand = Gtk.Image.new_from_file(str(Path(__file__).parent / "data" / "icon.png"))
+        brand = _leaf_image()
         brand.set_pixel_size(28)
         hb.pack_start(brand)
         hb.set_title_widget(Gtk.Label(label="VaultLeaf Backup"))
