@@ -6,8 +6,8 @@ VaultLeaf Backup is provided **"as is"**, without warranty of any kind,
 express or implied — including, but not limited to, the implied warranties of
 merchantability, fitness for a particular purpose, and non-infringement.
 
-The maintainers and contributors are **not liable** for any damages, data
-loss, security breaches, or other issues arising from the use of this
+No warranty is provided and **no liability is accepted** for any damages,
+data loss, security breaches, or other issues arising from the use of this
 software. **You are responsible** for the safety and integrity of your own
 data and systems.
 
@@ -31,9 +31,9 @@ If you believe you have found a security issue in VaultLeaf Backup:
 - **Do not** publicly disclose the vulnerability in issues, discussions, or
   pull requests before it has been triaged.
 - Open a **private vulnerability report** from the repository's **Security**
-  tab so the maintainer can review it privately.
+  tab so it can be reviewed privately.
 
 Given this is a community project with no formal security team, please allow
-time for a response. The maintainer will do their best to acknowledge reports,
-but **cannot guarantee** fixes, timelines, or that all reported issues will be
-addressed.
+time for a response. Reports will be acknowledged as best as possible, but
+there is **no guarantee** of fixes, timelines, or that all reported issues
+will be addressed.
