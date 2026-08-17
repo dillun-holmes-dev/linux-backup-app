@@ -1,5 +1,9 @@
 """Small StatusNotifierItem implementation for cross-desktop tray support."""
-from gi.repository import Gio, GLib
+from pathlib import Path
+
+import gi
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import GdkPixbuf, Gio, GLib
 
 from .metadata import APP_ICON, APP_NAME
 
@@ -33,6 +37,27 @@ SNI_XML = """
 """
 
 
+def load_icon_pixmaps(icon_path=None, sizes=(16, 22, 32, 48, 64)):
+    """Return SNI ARGB32 pixels so the desktop need not resolve an icon name."""
+    source = Path(icon_path or Path(__file__).with_name("data") / "icon.png")
+    pixmaps = []
+    for size in sizes:
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+            str(source), size, size, True)
+        pixels = bytes(pixbuf.get_pixels())
+        rowstride = pixbuf.get_rowstride()
+        channels = pixbuf.get_n_channels()
+        argb = bytearray()
+        for y_pos in range(pixbuf.get_height()):
+            for x_pos in range(pixbuf.get_width()):
+                offset = y_pos * rowstride + x_pos * channels
+                red, green, blue = pixels[offset:offset + 3]
+                alpha = pixels[offset + 3] if channels == 4 else 255
+                argb.extend((alpha, red, green, blue))
+        pixmaps.append((pixbuf.get_width(), pixbuf.get_height(), bytes(argb)))
+    return pixmaps
+
+
 class TrayIcon:
     PATH = "/StatusNotifierItem"
 
@@ -42,6 +67,7 @@ class TrayIcon:
         self.registration_id = 0
         self.registered_with_watcher = False
         self.status = "Active"
+        self.icon_pixmaps = load_icon_pixmaps()
         if self.connection is not None:
             info = Gio.DBusNodeInfo.new_for_xml(SNI_XML)
             self.registration_id = self.connection.register_object(
@@ -76,13 +102,13 @@ class TrayIcon:
             "Status": GLib.Variant("s", self.status),
             "WindowId": GLib.Variant("u", 0),
             "IconName": GLib.Variant("s", APP_ICON),
-            "IconPixmap": GLib.Variant("a(iiay)", []),
+            "IconPixmap": GLib.Variant("a(iiay)", self.icon_pixmaps),
             "AttentionIconName": GLib.Variant("s", "dialog-warning-symbolic"),
-            "AttentionIconPixmap": GLib.Variant("a(iiay)", []),
+            "AttentionIconPixmap": GLib.Variant("a(iiay)", self.icon_pixmaps),
             "OverlayIconName": GLib.Variant("s", ""),
             "OverlayIconPixmap": GLib.Variant("a(iiay)", []),
             "ToolTip": GLib.Variant("(sa(iiay)ss)",
-                                    (APP_ICON, [], APP_NAME,
+                                    (APP_ICON, self.icon_pixmaps, APP_NAME,
                                      "Running in the background")),
             "ItemIsMenu": GLib.Variant("b", False),
             "Menu": GLib.Variant("o", "/"),
