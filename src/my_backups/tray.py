@@ -1,9 +1,7 @@
 """Small StatusNotifierItem implementation for cross-desktop tray support."""
 from pathlib import Path
 
-import gi
-gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import GdkPixbuf, Gio, GLib
+from gi.repository import Gio, GLib
 
 from .metadata import APP_ICON, APP_NAME
 
@@ -39,22 +37,21 @@ SNI_XML = """
 
 def load_icon_pixmaps(icon_path=None, sizes=(16, 22, 32, 48, 64)):
     """Return SNI ARGB32 pixels so the desktop need not resolve an icon name."""
-    source = Path(icon_path or Path(__file__).with_name("data") / "icon.png")
+    source = Path(icon_path or Path(__file__).with_name("data") / "icon-64.rgba")
+    rgba = source.read_bytes()
+    if len(rgba) != 64 * 64 * 4:
+        raise RuntimeError("The bundled leaf icon pixels are invalid")
     pixmaps = []
     for size in sizes:
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-            str(source), size, size, True)
-        pixels = bytes(pixbuf.get_pixels())
-        rowstride = pixbuf.get_rowstride()
-        channels = pixbuf.get_n_channels()
         argb = bytearray()
-        for y_pos in range(pixbuf.get_height()):
-            for x_pos in range(pixbuf.get_width()):
-                offset = y_pos * rowstride + x_pos * channels
-                red, green, blue = pixels[offset:offset + 3]
-                alpha = pixels[offset + 3] if channels == 4 else 255
+        for y_pos in range(size):
+            for x_pos in range(size):
+                source_x = x_pos * 64 // size
+                source_y = y_pos * 64 // size
+                offset = (source_y * 64 + source_x) * 4
+                red, green, blue, alpha = rgba[offset:offset + 4]
                 argb.extend((alpha, red, green, blue))
-        pixmaps.append((pixbuf.get_width(), pixbuf.get_height(), bytes(argb)))
+        pixmaps.append((size, size, bytes(argb)))
     return pixmaps
 
 

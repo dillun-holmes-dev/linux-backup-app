@@ -8,5 +8,6 @@ import gi
 from .metadata import VERSION
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
 
 __version__ = VERSION
