@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 python3-gi gir1.2-gtk-4.0 \
-            libgdk-pixbuf2.0-bin ibus-gtk4 restic rclone curl file
+            libgdk-pixbuf2.0-bin ibus-gtk4 restic rclone curl file xvfb xauth
       - name: Verify version tag
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -44,6 +44,8 @@ jobs:
         run: |
           ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --version
           ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage --appimage-extract-and-run --self-test
+          xvfb-run -a ./dist/VaultLeafBackup-${{ matrix.arch }}.AppImage \
+            --appimage-extract-and-run --ui-test
       - name: Sign checksum manifest
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}

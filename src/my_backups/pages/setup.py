@@ -256,7 +256,7 @@ class SetupPage(Gtk.Box):
             "network storage connected automatically after restarts.")
 
         method_frame, method_box = self._frame("Storage method")
-        self.mode = Gtk.DropDown(model=Gtk.StringList(strings=[
+        self.mode = Gtk.DropDown(model=Gtk.StringList.new([
             "Google Drive account",
             "Local, external, or synced folder",
             "Windows or NAS network share (SMB)"
@@ -283,7 +283,7 @@ class SetupPage(Gtk.Box):
         refresh.connect("clicked", lambda *_: self._refresh_remotes())
         cloud.append(self._row("Connected account", self.remote_dd, refresh))
 
-        self.auth_mode = Gtk.DropDown(model=Gtk.StringList(strings=[
+        self.auth_mode = Gtk.DropDown(model=Gtk.StringList.new([
             "Easy shared rclone client", "Private Google API client JSON (advanced)"
         ]))
         self.auth_mode.set_selected(
@@ -408,7 +408,7 @@ class SetupPage(Gtk.Box):
         page.append(source_frame)
 
         speed_frame, speed_box = self._frame("Connection profile")
-        self.speed = Gtk.DropDown(model=Gtk.StringList(strings=[
+        self.speed = Gtk.DropDown(model=Gtk.StringList.new([
             "Reliable — slower networks and small chunks",
             "Balanced — recommended for most connections",
             "Fast — more parallel transfers and larger chunks"
@@ -452,7 +452,7 @@ class SetupPage(Gtk.Box):
         self.weekly_enabled = Gtk.CheckButton(label="Weekly backup")
         self.weekly_enabled.set_active(enabled.get("weekly", True))
         weekly_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.weekly_day = Gtk.DropDown(model=Gtk.StringList(strings=list(self.DAYS)))
+        self.weekly_day = Gtk.DropDown(model=Gtk.StringList.new(list(self.DAYS)))
         weekly_day = sched.get("weekly_day", "Sun")
         self.weekly_day.set_selected(self.DAYS.index(weekly_day) if weekly_day in self.DAYS else 6)
         self.weekly_time = TimePicker(sched.get("weekly_time", "20:00"))
@@ -466,7 +466,7 @@ class SetupPage(Gtk.Box):
         self.monthly_enabled.set_active(enabled.get("monthly", True))
         monthly_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         monthly_days = [str(value) for value in range(1, 29)] + ["Last day"]
-        self.monthly_day = Gtk.DropDown(model=Gtk.StringList(strings=monthly_days))
+        self.monthly_day = Gtk.DropDown(model=Gtk.StringList.new(monthly_days))
         saved_day = sched.get("monthly_day", "1")
         try:
             month_index = 28 if saved_day == "last" else min(27, max(0, int(saved_day) - 1))
@@ -484,7 +484,7 @@ class SetupPage(Gtk.Box):
         self.integrity_enabled = Gtk.CheckButton(label="Integrity check")
         self.integrity_enabled.set_active(enabled.get("integrity", True))
         integrity_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.integrity_day = Gtk.DropDown(model=Gtk.StringList(strings=list(self.DAYS)))
+        self.integrity_day = Gtk.DropDown(model=Gtk.StringList.new(list(self.DAYS)))
         integrity_day = sched.get("integrity_day", "Mon")
         self.integrity_day.set_selected(
             self.DAYS.index(integrity_day) if integrity_day in self.DAYS else 0)
@@ -581,7 +581,7 @@ class SetupPage(Gtk.Box):
 
     def _refresh_remotes(self, select=None):
         remotes = B.configured_drive_remotes(self.cfg.get("rclone_config"))
-        self.remote_dd.set_model(Gtk.StringList(strings=remotes))
+        self.remote_dd.set_model(Gtk.StringList.new(remotes))
         wanted = select or self.cfg.get("rclone_remote")
         if wanted in remotes:
             self.remote_dd.set_selected(remotes.index(wanted))

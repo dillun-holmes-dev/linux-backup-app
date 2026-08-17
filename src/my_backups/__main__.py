@@ -21,7 +21,23 @@ if __name__ == "__main__":
         for command in ("restic", "rclone", "minisign"):
             if not (bundled / command).is_file():
                 raise RuntimeError(f"Bundled {command} is unavailable")
+        # Instantiate the real application so GTK/GIO API incompatibilities
+        # fail the release build instead of failing on a user's desktop.
+        from .app import BackupApplication
+        application = BackupApplication()
+        application.cache.stop()
         print("VaultLeaf bundled runtime: OK")
+        sys.exit(0)
+    if "--ui-test" in sys.argv:
+        from .app import BackupApplication, BackupWindow, _set_linux_identity
+        _set_linux_identity()
+        application = BackupApplication()
+        if not application.register():
+            raise RuntimeError("Could not register the GTK application")
+        window = BackupWindow(application)
+        window.destroy()
+        application.cache.stop()
+        print("VaultLeaf GTK interface: OK")
         sys.exit(0)
     from .app import main
     sys.exit(main())

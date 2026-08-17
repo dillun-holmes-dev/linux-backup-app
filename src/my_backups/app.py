@@ -144,8 +144,9 @@ class BackupWindow(Gtk.ApplicationWindow):
 
 class BackupApplication(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id=APP_ID,
-                         flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        # flags defaults to 0 (G_APPLICATION_FLAGS_NONE) — valid on every
+        # GLib version; DEFAULT_FLAGS was removed from newer typelibs.
+        super().__init__(application_id=APP_ID)
         self.cfg = B.load_config()
         self.cache = B.Cache(self.cfg)
         self.window = None
