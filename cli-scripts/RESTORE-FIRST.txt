@@ -1,0 +1,34 @@
+MY BACKUPS - RESTORE KIT
+========================
+
+Pick the situation that matches you:
+
+----------------------------------------------------------
+ THIS PC STILL WORKS  ->  quick daily/weekly recovery
+----------------------------------------------------------
+Do it on THIS machine (tools already installed):
+    restic -r rclone:gdrive:daily  snapshots
+    restic -r rclone:gdrive:daily  restore latest \
+        --include /path/to/file --target ~/restored
+(also available: rclone:gdrive:weekly)
+
+----------------------------------------------------------
+ THIS PC IS GONE  ->  full monthly restore (any other PC)
+----------------------------------------------------------
+The monthly image brings back the whole OS, bootable.
+
+  On another LINUX PC / Live USB:
+    1. sudo apt install -y rclone restic gnupg zstd openssl
+    2. rclone config reconnect gdrive:
+    3. rclone copy gdrive:restore-tools ~/backup-scripts
+    4. cd ~/backup-scripts
+    5. gpg -d KEYS-LOCKED.gpg > keys.tar.gz && tar -xzf keys.tar.gz   (unlocks keys)
+    6. sudo ./restore-monthly.sh /dev/nvmeXnY
+
+  On WINDOWS:
+    read RESTORE-ON-WINDOWS.txt in this folder (WSL2 + balenaEtcher)
+
+----------------------------------------------------------
+KEYS: locked in KEYS-LOCKED.gpg (AES-256). The unlock password is
+      yours alone - it is NOT stored on this Drive.
+DETAILS: restore.md in this folder.

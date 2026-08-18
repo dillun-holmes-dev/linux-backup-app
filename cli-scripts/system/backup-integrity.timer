@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly integrity check timer
+
+[Timer]
+OnCalendar=Mon *-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Start backup at boot if the last one is stale
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/dillun/backup-scripts/backup-stale-check.sh
+Environment=HOME=/root
+
+[Install]
+WantedBy=multi-user.target

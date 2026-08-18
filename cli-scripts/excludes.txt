@@ -1,0 +1,17 @@
+/proc
+/sys
+/dev
+/run
+/tmp
+/var/tmp
+/mnt
+/media
+/var/cache
+/var/lib/snapd/cache
+/lost+found
+/home/*/.cache
+/home/*/.thumbnails
+/home/*/.local/share/Trash
+/home/dillun/GoogleDrive
+/home/dillun/MyBackups/CloudDrive
+/home/dillun/supabase-project/volumes/db

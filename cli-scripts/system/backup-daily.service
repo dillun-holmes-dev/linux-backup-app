@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted system backup to Google Drive (restic)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/dillun/backup-scripts/backup-daily.sh
+Nice=10
+IOSchedulingClass=idle
+Environment=HOME=/root
