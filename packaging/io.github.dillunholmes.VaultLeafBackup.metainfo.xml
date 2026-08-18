@@ -20,6 +20,11 @@
     <category>Archiving</category>
   </categories>
   <releases>
+    <release version="1.4.3" date="2026-08-18">
+      <description>
+        <p>Adds and optimizes standalone CLI backup scripts for headless use, bypassing FUSE mounts and saturating Google Drive upload connections.</p>
+      </description>
+    </release>
     <release version="1.4.2" date="2026-08-17">
       <description>
         <p>Adds full shutdown/resume of backup services from the tray and menu, and fixes a Setup page crash on already-configured systems.</p>
