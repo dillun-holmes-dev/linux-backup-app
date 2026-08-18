@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly backup integrity check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/dillun/backup-scripts/check-integrity.sh
+Nice=10
+IOSchedulingClass=idle
+Environment=HOME=/root

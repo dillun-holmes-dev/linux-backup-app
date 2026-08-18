@@ -1,0 +1,46 @@
+RESTORING THE MONTHLY IMAGE ON WINDOWS
+======================================
+Use this when this PC is gone and you're restoring onto a new NVMe/USB from a
+Windows machine. Best route: WSL2 (gives Linux tools) + balenaEtcher (writes the
+image). All your data is on Google Drive - you never need the old PC.
+
+STEP 1 - Install WSL2 (once)
+    Open PowerShell as Administrator:
+        wsl --install -d Ubuntu
+    Restart. Ubuntu opens; set a username + password.
+
+STEP 2 - Inside Ubuntu (WSL), install the tools:
+        sudo apt update && sudo apt install -y rclone zstd openssl gnupg
+
+STEP 3 - Connect to Google Drive (authorize in the browser):
+        rclone config reconnect gdrive:
+
+STEP 4 - Download the newest monthly image:
+        cd ~
+        LATEST=$(rclone lsf gdrive:monthly --dirs-only | tail -1)
+        echo "restoring: $LATEST"
+        mkdir -p restore && rclone copy "gdrive:monthly/$LATEST" restore/
+
+STEP 5 - Get your keys (they are in the restore-tools folder on Drive):
+        cd ~
+        rclone copy gdrive:restore-tools .
+        gpg -d KEYS-LOCKED.gpg > keys.tar.gz && tar -xzf keys.tar.gz
+        cp backup-key.bin restore/
+
+STEP 6 - Build the raw image (reassemble + decrypt + decompress):
+        cd ~/restore
+        cat system-*.part.* | openssl enc -d -aes-256-cbc -pbkdf2 -salt \
+            -pass file:backup-key.bin | zstd -d -T0 -o disk.img
+
+STEP 7 - Write disk.img to your new NVMe/USB with balenaEtcher:
+        https://etcher.balena.io/   (or Win32 Disk Imager)
+        Select disk.img -> select target disk -> Flash.
+        DOUBLE-CHECK you picked the RIGHT disk - it will be completely wiped!
+
+STEP 8 - Boot the new disk. That's it - your OS, files and apps are back.
+
+NOTE: If you'd rather write from WSL and WSL can see the raw disk:
+        sudo dd if=~/restore/disk.img of=/dev/sdX bs=4M status=progress
+      balenaEtcher is the reliable option on Windows.
+
+The image is an exact clone of your OS drive - it boots exactly like your PC did.

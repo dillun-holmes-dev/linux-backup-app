@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly full bootable disk image to Google Drive
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/dillun/backup-scripts/backup-monthly.sh
+Nice=10
+IOSchedulingClass=idle
+Environment=HOME=/root
