@@ -1,235 +1,236 @@
-# VaultLeaf Backup — easy Linux backup manager
+<div align="center">
 
-A native GTK4 backup app built on **restic** and **rclone**. It includes an
-easy setup flow; pre-written scripts and hand-edited systemd units are no
-longer required.
+<img src="src/my_backups/data/icon.svg" width="112" alt="VaultLeaf Backup icon" />
 
-![icon](src/my_backups/data/icon.svg)
+# VaultLeaf Backup
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
+**Easy, encrypted, automatic backups for Linux.**<br/>
+A native GTK4 app built on [restic](https://restic.net) and [rclone](https://rclone.org): back up to Google Drive,
+a Windows or NAS share, or any local disk, with no scripts and no terminal.
+
+[![Latest release](https://img.shields.io/github/v/release/dillun-holmes-dev/linux-backup-app?style=flat-square&color=22c55e&label=release)](https://github.com/dillun-holmes-dev/linux-backup-app/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/dillun-holmes-dev/linux-backup-app/total?style=flat-square&color=16a34a)](https://github.com/dillun-holmes-dev/linux-backup-app/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-15803d?style=flat-square)](LICENSE)
+![Linux x86-64 · ARM64](https://img.shields.io/badge/Linux-x86--64%20%C2%B7%20ARM64-14532d?style=flat-square&logo=linux&logoColor=white)
+![GTK4](https://img.shields.io/badge/GTK4-native-14532d?style=flat-square&logo=gtk&logoColor=white)
+
+<br/>
+
+<a href="https://github.com/dillun-holmes-dev/linux-backup-app/releases/latest/download/VaultLeafBackup-x86_64.AppImage"><img src="https://img.shields.io/badge/Download-x86--64%20AppImage-22c55e?style=for-the-badge&logo=linux&logoColor=white" alt="Download the x86-64 AppImage" /></a>
+<a href="https://github.com/dillun-holmes-dev/linux-backup-app/releases/latest/download/VaultLeafBackup-aarch64.AppImage"><img src="https://img.shields.io/badge/Download-ARM64%20AppImage-15803d?style=for-the-badge&logo=linux&logoColor=white" alt="Download the ARM64 AppImage" /></a>
+
+<sub>One self-contained file: Python, GTK4, restic and rclone are all inside. No install, no admin password.</sub>
+
+</div>
+
+---
 
 ## Features
 
-- **Overview** — live progress bars for daily, weekly, and monthly backups, upload speed,
-  ETA, storage information, manual **Back up now** controls, interrupted-backup
-  continuation, and the next scheduled runs.
-- **Automatic recovery** — detects an existing backup plan and resumes an
-  interrupted job after login, retrying with a safe delay until it completes.
-- **Backups & logs** — snapshot lists for daily, weekly, and monthly repositories plus
-  live logs.
-- **Restore** — a guided, overwrite-safe recovery flow with friendly dates,
-  partial recovery, confirmation, cancellation, progress, and one-click access.
-- **Backup plan** — connect Google Drive with OAuth, connect a persistent SMB
-  network share, or choose a local/synced folder; then fully customize jobs.
-- **Settings** — direct shortcuts for storage, source, speed, and schedules;
-  browse for exclusions; and view upcoming jobs and destinations.
-- **Verified updates** — checks GitHub Releases, selects the correct x86-64 or
-  ARM64 AppImage, verifies its SHA-256 checksum, and atomically replaces the
-  single installed copy.
-- **Safe uninstall** — removes the app and schedules while preserving backup
-  repositories, encryption keys, settings, and logs.
+<table>
+  <tr>
+    <td width="50%" valign="top">📊 <b>Live overview</b><br/><sub>Progress, speed, ETA and the next scheduled runs, at a glance.</sub></td>
+    <td width="50%" valign="top">🧭 <b>Guided setup</b><br/><sub>Five clear steps. Nothing changes until you click <b>Finish setup</b>.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">☁️ <b>Back up anywhere</b><br/><sub>Google Drive, a Windows or NAS share, or any local or external disk.</sub></td>
+    <td width="50%" valign="top">🔐 <b>Encrypted &amp; verified</b><br/><sub>Encrypted, deduplicated snapshots, with weekly integrity checks.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">♻️ <b>Safe restore</b><br/><sub>Pick a date, restore all or part, and never overwrite by accident.</sub></td>
+    <td width="50%" valign="top">🔁 <b>Never misses a backup</b><br/><sub>Interrupted or missed backups resume automatically.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">🛡️ <b>Signed updates</b><br/><sub>Every update is signature- and checksum-verified before it installs.</sub></td>
+    <td width="50%" valign="top">🧹 <b>Keeps your data</b><br/><sub>Uninstalling never removes your backups or encryption keys.</sub></td>
+  </tr>
+</table>
 
-## Easy first-run setup
+## Quick start
 
-Open **Backup plan**. A five-step assistant guides users through
-**Welcome → Storage → Backup → Schedule → Review**. It validates each step,
-explains recommended choices, and changes nothing until **Finish setup**.
+1. **Download** the AppImage for your computer: [x86-64](https://github.com/dillun-holmes-dev/linux-backup-app/releases/latest/download/VaultLeafBackup-x86_64.AppImage) (most PCs) or [ARM64](https://github.com/dillun-holmes-dev/linux-backup-app/releases/latest/download/VaultLeafBackup-aarch64.AppImage).
+2. **Run it.** Right-click → *Allow Launching* and double-click, or:
+   ```sh
+   chmod +x VaultLeafBackup-x86_64.AppImage
+   ./VaultLeafBackup-x86_64.AppImage
+   ```
+   The first run installs a stable copy under `~/.local` with a menu entry.
+3. **Open Backup plan**, follow the five steps, and you're protected. VaultLeaf keeps running from
+   the tray, and closing the window doesn't stop your backups.
 
-Choose one:
+Already set up on this computer? A newer AppImage picks up your existing storage, folders, key and
+schedules automatically, with no second setup.
 
-- **Cloud account (rclone OAuth)** — click **Add Google Drive account…**.
-  rclone opens OAuth sign-in in your browser. Return to the app and select the
-  new account. Accounts already present in rclone are also listed.
-- **Local or synced folder** — choose a writable local disk, external disk,
-  NAS folder, or a folder already managed by another sync app.
-- **Windows or NAS share (SMB)** — enter the server, share, and login, test the
-  connection, and choose where it should appear locally. VaultLeaf creates a
-  user service that reconnects after login (including after a reboot) and
-  retries network failures.
-  The password is obscured in rclone's private configuration and is not copied
-  into VaultLeaf's JSON settings.
+## How it works
 
-The app creates a private restic password, backup repositories, and user-level
-systemd schedules. Cloud mode also creates `~/MyBackups/CloudDrive` and enables
-a persistent rclone mount. It reconnects after reboot when the user signs in.
-Timers use `Persistent=true`, so a backup missed while the computer was off
-runs after it starts again.
-
-Daily, weekly, monthly, and integrity jobs can each be enabled or disabled.
-Choose exact 24-hour times, weekdays, a monthly date from 1–28, or the last day
-of every month. Disabled backups remain available from **Run now**.
-
-Local destinations receive a small marker file. If an external disk or network
-folder is missing, the scheduled backup stops instead of silently writing to
-the wrong disk.
-
-### Easy or faster Google connection
-
-- **Easy shared rclone client** needs only browser sign-in. It can be slower
-  when many people are sharing the default Google API quota.
-- **Private Google API client JSON** uses your own quota. Create a Desktop OAuth
-  client in Google Cloud, add your account as a test user, download the JSON,
-  and select it in setup. The secret is passed directly into rclone and is not
-  copied into the app's configuration.
-
-Choose a reliable, balanced, or fast connection profile. This controls rclone
-concurrency, Drive upload chunk size, retries, cloud refresh frequency, and the
-percentage of repository data sampled by integrity checks.
-
-### Background operation and integrity alerts
-
-Setup installs an XDG autostart entry and a permanent user-local application
-copy. Closing the main window hides it; backups and integrity checks continue.
-On desktops supporting StatusNotifierItem, left-clicking the tray icon opens
-the app and right-clicking opens controls containing **Quit background app**.
-If a desktop hides tray icons, a notification provides the same controller.
-
-A persistent weekly integrity timer checks repository structure and samples
-stored data. A failure produces both a desktop notification and a blocking
-error popup, and the tray icon requests attention. Integrity output appears in
-**Backups & logs**.
-
-### Easy exclusions
-
-In **Settings**, choose **Add files…** or **Add folders…** and select one or
-more items. Paths are deduplicated and saved automatically. Advanced users can
-still enter restic patterns directly. The app rejects selections that would
-exclude the entire backup source.
-
-## Requirements
-
-The AppImage is self-contained: it includes Python, PyGObject, GTK4, `restic`,
-`rclone`, and the update signature verifier. The person running it does not
-install those components. As with
-other AppImages, it needs a 64-bit Linux desktop. FUSE is only needed when using
-the optional mounted cloud-folder feature; local-folder backups and direct
-cloud repositories do not need it.
-
-Running directly from the source checkout still requires Python, PyGObject,
-GTK4, `restic`, and `rclone` on the developer's computer.
-
-## Run (without packaging)
-
-```sh
-cd "backup llinux app"
-chmod +x run-my-backups.sh   # once
-./run-my-backups.sh
-# or
-PYTHONPATH=src python3 -m my_backups
+```mermaid
+flowchart LR
+    A["📁 Your files"] --> B["🔐 restic<br/>encrypt · deduplicate · snapshot"]
+    B --> C["🔌 rclone"]
+    C --> D["☁️ Google Drive"]
+    C --> E["🖧 Windows / NAS share"]
+    B --> F["💽 Local or external disk"]
+    G["⏰ systemd user timers<br/>daily · weekly · monthly · integrity"] -.-> B
 ```
 
-On a new machine, download the AppImage for that computer's CPU and run it.
-VaultLeaf places one stable executable under `~/.local`, removes older
-VaultLeaf AppImage downloads, creates its application-menu entry, and opens.
-No Python installation or administrator password is needed.
+VaultLeaf creates a private restic password, the backup repositories and user-level systemd
+schedules for you. Daily, weekly, monthly and integrity jobs can each be switched on or off, at
+exact times, weekdays, a monthly date (1–28) or the last day of the month. Local destinations get
+a small marker file: if a disk or network folder is missing, the backup stops instead of writing
+to the wrong place.
 
-## Build the AppImage
+## More details
 
-```sh
-cd "backup llinux app"
-bash packaging/build-appimage.sh     # needs curl; downloads appimagetool once
-```
+<details>
+<summary><b>Connecting Google Drive: easy or faster</b></summary>
 
-Result: **`VaultLeafBackup-x86_64.AppImage`** in the project root. Build on the
-oldest Linux release you want to support because Linux's core C library cannot
-be safely bundled. Building on Ubuntu 22.04 is a good compatibility baseline.
+<br/>
 
-For a complete release with an AppImage, a no-AppImage-mount portable archive,
-and SHA-256 checksums, run `./packaging/build-release.sh`. See
-[`docs/PORTABILITY.md`](docs/PORTABILITY.md) for the exact compatibility model.
-Use `./packaging/build-compatible.sh` on either native x86-64 or ARM64 Linux to
-make the matching Ubuntu 22.04 baseline release in Docker.
+- **Easy shared rclone client:** browser sign-in only. It can be slower when many people share the
+  default Google API quota.
+- **Private Google API client JSON:** uses your own quota. Create a *Desktop* OAuth client in Google
+  Cloud, add your account as a test user, download the JSON and select it in setup. The secret goes
+  straight to rclone and is not copied into VaultLeaf's settings.
 
-Tagged GitHub releases are built natively for both `x86_64` and `aarch64` by
-`.github/workflows/release.yml`. Set `VERSION` in
-`src/my_backups/metadata.py`, push the matching tag (for example `v1.1.0`), and
-the workflow publishes both architectures, signed checksum files, release
-notes, and verifiable build provenance.
+Then choose a **reliable**, **balanced** or **fast** connection profile. It controls rclone
+concurrency, Drive upload chunk size, retries, cloud refresh frequency and how much repository data
+the integrity check samples.
 
-## Updates and uninstall
+Cloud mode also creates `~/MyBackups/CloudDrive` and a persistent rclone mount that reconnects when
+you sign in.
+</details>
 
-Open **Settings → Application → Check for updates**. VaultLeaf downloads only
-the AppImage matching the computer's architecture. It first authenticates the
-release manifest with the embedded VaultLeaf publisher key, then refuses to
-install the file if its SHA-256 checksum does not match. See
-[`SECURITY.md`](SECURITY.md) for manual signature and provenance verification.
+<details>
+<summary><b>Windows and NAS shares (SMB)</b></summary>
 
-Use **Settings → Application → Uninstall VaultLeaf**, or run:
+<br/>
+
+Enter the server, share and login, test the connection, and choose where it appears locally.
+VaultLeaf creates a user service that reconnects after login (including after a reboot) and retries
+network failures. The password is obscured in rclone's private configuration and is never copied
+into VaultLeaf's JSON settings.
+</details>
+
+<details>
+<summary><b>Running in the background, and integrity alerts</b></summary>
+
+<br/>
+
+Setup adds an autostart entry and a permanent user-local copy of the app. Closing the main window
+hides it; backups and integrity checks continue. On desktops with a system tray, left-click the icon
+to open the app and right-click for controls, including **Quit background app**. If your desktop
+hides tray icons, a notification offers the same controls.
+
+A weekly integrity timer checks the repository structure and samples stored data. A failure shows a
+desktop notification and a blocking error popup, the tray icon asks for attention, and the output
+appears in **Backups & logs**.
+</details>
+
+<details>
+<summary><b>Excluding files and folders</b></summary>
+
+<br/>
+
+In **Settings**, choose **Add files…** or **Add folders…**. Paths are de-duplicated and saved
+automatically. Advanced users can enter restic patterns directly. VaultLeaf refuses an exclusion
+that would skip the entire backup source.
+</details>
+
+<details>
+<summary><b>Restoring files</b></summary>
+
+<br/>
+
+**Restore runs as your user** and writes to the folder you choose (`~/Restored` by default). Daily,
+weekly and monthly snapshots are all available. The flow never overwrites silently: it asks for
+confirmation and can be cancelled at any time.
+</details>
+
+<details>
+<summary><b>Updates and uninstalling</b></summary>
+
+<br/>
+
+**Settings → Application → Check for updates** downloads only the AppImage for your computer's
+architecture. VaultLeaf first authenticates the release manifest with its embedded publisher key,
+then refuses the file if its SHA-256 checksum doesn't match. See [SECURITY.md](SECURITY.md) to
+verify signatures and build provenance by hand.
+
+To uninstall, use **Settings → Application → Uninstall VaultLeaf**, or run:
 
 ```sh
 vaultleaf-uninstall
 # or: ./VaultLeafBackup-x86_64.AppImage --uninstall
 ```
 
-Uninstalling intentionally keeps encryption keys, settings, logs, and existing
-backup repositories so it cannot make an encrypted backup inaccessible.
+Encryption keys, settings, logs and backup repositories are kept on purpose, so uninstalling can
+never make an encrypted backup unreadable.
+</details>
 
-### Install & launch the AppImage
+<details>
+<summary><b>Requirements and where things are stored</b></summary>
+
+<br/>
+
+- **AppImage:** any 64-bit Linux desktop. Python, PyGObject, GTK4, restic, rclone and the update
+  signature verifier are all bundled. FUSE is only needed for the optional mounted cloud folder.
+- **From source:** Python 3.10+, PyGObject, GTK4, restic and rclone.
+- New setups run as your user and need no administrator password (older root-based setups still use
+  `pkexec`).
+- Setup data: `~/.local/share/my-backups/`. Advanced configuration:
+  `~/.config/my-backups/config.json`. No secrets are bundled in the AppImage.
+</details>
+
+<details>
+<summary><b>Run from source and build the AppImage</b></summary>
+
+<br/>
 
 ```sh
-chmod +x VaultLeafBackup-x86_64.AppImage
-./VaultLeafBackup-x86_64.AppImage    # just run it, or
+git clone https://github.com/dillun-holmes-dev/linux-backup-app.git
+cd linux-backup-app
+./run-my-backups.sh                  # or: PYTHONPATH=src python3 -m my_backups
 ```
 
-On desktops that require it, right-click the download and choose
-**Allow Launching**, then double-click it. The first run installs the stable
-user-local copy and menu icon automatically. Later double-clicks open the
-already-running window; a newer downloaded AppImage replaces the older
-installed copy.
+Build the AppImage (needs `curl`; downloads `appimagetool` once):
 
-If VaultLeaf was already configured, a newer AppImage automatically uses the
-existing storage, source folder, encryption key, exclusions, and schedules.
-There is no second setup wizard. If the computer shuts down during a backup,
-VaultLeaf continues that job after the next login and keeps retrying until a
-complete snapshot is recorded.
+```sh
+bash packaging/build-appimage.sh     # → VaultLeafBackup-x86_64.AppImage
+```
 
-## Notes
+Build on the oldest Linux you want to support, because the core C library can't be safely bundled;
+Ubuntu 22.04 is a good baseline. `./packaging/build-release.sh` makes a full release (AppImage,
+portable archive and SHA-256 checksums), and `./packaging/build-compatible.sh` builds the Ubuntu
+22.04 baseline in Docker on x86-64 or ARM64. See [docs/PORTABILITY.md](docs/PORTABILITY.md).
 
-- New setups run as the current user and do not need an administrator password.
-  Existing root backup configurations still use `pkexec`.
-- **Restore runs as your user** and writes to the folder you choose
-  (default `~/Restored`). Daily, weekly, and monthly snapshots are available.
-- The AppImage carries its own Python, GTK, `restic`, and `rclone` runtime.
-- Setup data is kept in `~/.local/share/my-backups/`; advanced configuration
-  is in `~/.config/my-backups/config.json`.
-- Secrets are **not** bundled in the AppImage.
+**Releasing:** set `VERSION` in `src/my_backups/metadata.py` and push a matching tag (e.g. `v1.5.0`).
+`.github/workflows/release.yml` builds `x86_64` and `aarch64` natively and publishes both, with signed
+checksums, release notes and verifiable build provenance.
+</details>
 
 ## Contributing
 
-Found a bug? Have an idea? Want to lend a hand? **All are welcome!**
+Bug reports, ideas and pull requests are all welcome, from a one-line typo fix to a whole feature.
 
-- 🐛 **Report a bug** — open an issue with the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
-- 💭 **Suggest a feature** — use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.yml)
-- 🔧 **Send a fix or improvement** — fork and open a [pull request](.github/pull_request_template.md)
+[![Report a bug](https://img.shields.io/badge/Report%20a%20bug-dc2626?style=flat-square&logo=github&logoColor=white)](https://github.com/dillun-holmes-dev/linux-backup-app/issues/new?template=bug_report.yml)
+[![Suggest a feature](https://img.shields.io/badge/Suggest%20a%20feature-2563eb?style=flat-square&logo=github&logoColor=white)](https://github.com/dillun-holmes-dev/linux-backup-app/issues/new?template=feature_request.yml)
+[![Issues](https://img.shields.io/github/issues/dillun-holmes-dev/linux-backup-app?style=flat-square)](https://github.com/dillun-holmes-dev/linux-backup-app/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/dillun-holmes-dev/linux-backup-app?style=flat-square)](https://github.com/dillun-holmes-dev/linux-backup-app/pulls)
 
-Every contribution counts — from a one-line typo fix to a whole feature.
-`main` is protected: changes land via a reviewed pull request, and the
-maintainer merges. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
-workflow.
-
-[![Issues](https://img.shields.io/github/issues/dillun-holmes-dev/linux-backup-app)](https://github.com/dillun-holmes-dev/linux-backup-app/issues)
-[![Pull requests](https://img.shields.io/github/issues-pr/dillun-holmes-dev/linux-backup-app)](https://github.com/dillun-holmes-dev/linux-backup-app/pulls)
+`main` is protected: changes land through a reviewed pull request. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Support
 
-VaultLeaf Backup is free and open source. If you'd like to support the
-project, you can sponsor it on GitHub:
+VaultLeaf Backup is free and open source. If it saves your files, you can support it, though it's
+entirely optional:
 
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
-
-Sponsorship is entirely optional.
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/dillun-holmes-dev)
 
 ## Acknowledgements
 
-Thanks to [**Crypticat**](https://github.com/Crypticat) for the inspiration
-behind VaultLeaf Backup — what started as a collection of shell scripts
-became a proper app. 🙌
+Thanks to [**Crypticat**](https://github.com/Crypticat) for the inspiration behind VaultLeaf Backup.
+What started as a collection of shell scripts became a proper app.
 
 ## License
 
-Copyright 2026 dillun-holmes-dev
-
-Licensed under the [Apache License, Version 2.0](LICENSE). You may use,
-modify, and distribute this project under that license; see the
-[LICENSE](LICENSE) file for the full terms.
+Copyright 2026 dillun-holmes-dev. Licensed under the [Apache License, Version 2.0](LICENSE).
